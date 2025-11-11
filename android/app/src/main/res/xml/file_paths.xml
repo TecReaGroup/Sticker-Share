@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="shared_gifs" path="shared_gifs/"/>
+    <external-cache-path name="external_shared_gifs" path="shared_gifs/"/>
+    <files-path name="files" path="."/>
+    <external-files-path name="external_files" path="."/>
+</paths>
