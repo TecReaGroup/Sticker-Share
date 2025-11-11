@@ -18,13 +18,12 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _isScrolling = false;
-  Timer? _scrollEndTimer;
+  bool _isFingerDown = false;  // Track if finger is touching the screen
+  Timer? _resumeAnimationTimer;  // Timer for delayed animation resume
 
   @override
   void initState() {
     super.initState();
-    
-    _scrollController.addListener(_onScroll);
     
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final provider = context.read<StickerProvider>();
@@ -35,23 +34,20 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _onScroll() {
-    _scrollEndTimer?.cancel();
-    
-    if (!_isScrolling) {
-      setState(() => _isScrolling = true);
+  bool _handleScrollNotification(ScrollNotification notification) {
+    // Only pause animations during ScrollUpdate if finger is still down
+    if (notification is ScrollUpdateNotification) {
+      if (_isFingerDown && !_isScrolling) {
+        setState(() => _isScrolling = true);
+      }
     }
     
-    _scrollEndTimer = Timer(const Duration(milliseconds: 100), () {
-      if (mounted) {
-        setState(() => _isScrolling = false);
-      }
-    });
+    return false;
   }
 
   @override
   void dispose() {
-    _scrollEndTimer?.cancel();
+    _resumeAnimationTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
@@ -135,27 +131,57 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           }
 
-          return GridView.builder(
-            controller: _scrollController,
-            key: ValueKey('grid_${provider.selectedThemeId}_${provider.showFavoritesOnly}'),
-            padding: const EdgeInsets.all(8),
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            ),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: 1,
-            ),
-            itemCount: stickers.length,
-            itemBuilder: (context, index) {
-              final sticker = stickers[index];
-              return _StickerCard(
-                sticker: sticker,
-                isScrolling: _isScrolling,
-              );
+          return Listener(
+            onPointerDown: (_) {
+              // Finger touches screen - pause animations immediately
+              _resumeAnimationTimer?.cancel();
+              if (!_isFingerDown) {
+                setState(() {
+                  _isFingerDown = true;
+                  _isScrolling = true;
+                });
+              }
             },
+            onPointerUp: (_) {
+              // Finger leaves screen - mark finger as up but keep animations paused
+              setState(() {
+                _isFingerDown = false;
+              });
+              
+              // Schedule animation resume after delay (150ms)
+              // This prevents flicker on quick swipes while still being responsive
+              _resumeAnimationTimer?.cancel();
+              _resumeAnimationTimer = Timer(const Duration(milliseconds: 100), () {
+                if (mounted && !_isFingerDown) {
+                  setState(() => _isScrolling = false);
+                }
+              });
+            },
+            child: NotificationListener<ScrollNotification>(
+              onNotification: _handleScrollNotification,
+              child: GridView.builder(
+                controller: _scrollController,
+                key: ValueKey('grid_${provider.selectedThemeId}_${provider.showFavoritesOnly}'),
+                padding: const EdgeInsets.all(8),
+                physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
+                ),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  childAspectRatio: 1,
+                ),
+                itemCount: stickers.length,
+                itemBuilder: (context, index) {
+                  final sticker = stickers[index];
+                  return _StickerCard(
+                    sticker: sticker,
+                    isScrolling: _isScrolling,
+                  );
+                },
+              ),
+            ),
           );
         },
       ),

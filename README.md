@@ -86,7 +86,9 @@ flutter run -d android
 Lottie.asset(
   sticker.localPath,  // Lottie JSON文件路径
   fit: BoxFit.cover,
-  frameRate: FrameRate.max,
+  animate: !widget.isScrolling,  // 滚动时暂停动画
+  frameRate: FrameRate(60),      // 限制帧率为60fps
+  renderCache: RenderCache.raster, // 使用光栅缓存
 )
 ```
 
@@ -95,6 +97,77 @@ Lottie.asset(
 - ✅ 文件小，加载快
 - ✅ 支持复杂动画效果
 - ✅ 跨平台一致性好
+
+### 滚动优化 - 智能动画控制
+
+为了保证滚动流畅性和 60fps 的预览体验，应用实现了智能的动画暂停/恢复机制：
+
+#### 工作流程
+
+1. **手指触摸屏幕** → 立即暂停所有 Lottie 动画 ✅
+2. **手指离开屏幕** → 标记手指状态为离开，但动画保持暂停 ✅
+3. **150ms 延迟后** → 如果手指没有再次触摸，恢复动画播放 ✅
+4. **惯性滚动期间** → 因为手指已离开，动画正常播放，不会闪烁 ✅
+
+#### 实现原理
+
+```dart
+// 使用 Listener 监听指针事件
+Listener(
+  onPointerDown: (_) {
+    // 手指触摸 - 立即暂停动画
+    _resumeAnimationTimer?.cancel();
+    setState(() {
+      _isFingerDown = true;
+      _isScrolling = true;  // 暂停动画
+    });
+  },
+  onPointerUp: (_) {
+    // 手指离开 - 延迟恢复动画
+    setState(() => _isFingerDown = false);
+    
+    // 150ms 后恢复动画（避免快速滑动时闪烁）
+    _resumeAnimationTimer = Timer(const Duration(milliseconds: 150), () {
+      if (mounted && !_isFingerDown) {
+        setState(() => _isScrolling = false);
+      }
+    });
+  },
+  child: GridView.builder(...),
+)
+```
+
+#### 延迟参数调整
+
+可以根据使用体验调整恢复延迟时间：
+
+| 延迟时间 | 适用场景 | 说明 |
+|---------|---------|------|
+| **100ms** | 快速浏览 | 动画恢复更快，适合快速滑动查看 |
+| **150ms** | 平衡选择 | ⭐ **推荐** - 平衡流畅性和响应速度 |
+| **200ms** | 避免闪烁 | 更长延迟，确保惯性滚动时动画稳定 |
+
+修改位置：`lib/screens/home_screen.dart` 第 166 行
+```dart
+_resumeAnimationTimer = Timer(const Duration(milliseconds: 150), () {
+  // 调整这里的数值：100, 150, 或 200
+});
+```
+
+#### 性能优化要点
+
+- ✅ **仅在触摸时暂停** - 避免不必要的性能开销
+- ✅ **延迟恢复机制** - 防止快速滑动时动画频繁启停
+- ✅ **光栅缓存** - 提升 Lottie 渲染性能
+- ✅ **60fps 帧率限制** - 平衡性能和视觉效果
+- ✅ **智能状态管理** - 使用 `_isFingerDown` 和 `_isScrolling` 分离控制
+
+#### 用户体验
+
+- 🎯 **流畅滚动** - 滚动时暂停动画，确保 60fps
+- 🎯 **快速响应** - 手指离开后短暂延迟即恢复
+- 🎯 **无闪烁** - 惯性滚动期间动画正常播放
+- 🎯 **自然过渡** - 延迟机制让交互更自然
 
 ### 动态资源管理
 
