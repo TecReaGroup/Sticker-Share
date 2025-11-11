@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lottie/lottie.dart';
@@ -15,9 +16,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  final ScrollController _scrollController = ScrollController();
+  bool _isScrolling = false;
+  Timer? _scrollEndTimer;
+
   @override
   void initState() {
     super.initState();
+    
+    _scrollController.addListener(_onScroll);
     
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final provider = context.read<StickerProvider>();
@@ -26,6 +33,27 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       await provider.scanAndLoadAssets();
     });
+  }
+
+  void _onScroll() {
+    _scrollEndTimer?.cancel();
+    
+    if (!_isScrolling) {
+      setState(() => _isScrolling = true);
+    }
+    
+    _scrollEndTimer = Timer(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        setState(() => _isScrolling = false);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollEndTimer?.cancel();
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -108,8 +136,12 @@ class _HomeScreenState extends State<HomeScreen> {
           }
 
           return GridView.builder(
+            controller: _scrollController,
             key: ValueKey('grid_${provider.selectedThemeId}_${provider.showFavoritesOnly}'),
             padding: const EdgeInsets.all(8),
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
               crossAxisSpacing: 8,
@@ -119,7 +151,10 @@ class _HomeScreenState extends State<HomeScreen> {
             itemCount: stickers.length,
             itemBuilder: (context, index) {
               final sticker = stickers[index];
-              return _StickerCard(sticker: sticker);
+              return _StickerCard(
+                sticker: sticker,
+                isScrolling: _isScrolling,
+              );
             },
           );
         },
@@ -221,9 +256,11 @@ class _ThemeSelector extends StatelessWidget {
 
 class _StickerCard extends StatefulWidget {
   final StickerModel sticker;
+  final bool isScrolling;
 
   const _StickerCard({
     required this.sticker,
+    required this.isScrolling,
   });
 
   @override
@@ -245,7 +282,10 @@ class _StickerCardState extends State<_StickerCard> {
           child: Lottie.asset(
             widget.sticker.localPath,
             fit: BoxFit.cover,
-            frameRate: FrameRate.max,
+            repeat: true,
+            animate: !widget.isScrolling,
+            frameRate: FrameRate(60),
+            renderCache: RenderCache.raster,
             errorBuilder: (context, error, stackTrace) {
               debugPrint('Lottie error for ${widget.sticker.localPath}: $error');
               return Container(
