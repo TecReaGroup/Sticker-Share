@@ -1,7 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import '../models/emoji_model.dart';
-import '../models/category_model.dart';
+import '../models/sticker_model.dart';
+import '../models/theme_model.dart';
 
 class DatabaseService {
   static Database? _database;
@@ -13,124 +13,141 @@ class DatabaseService {
   }
 
   Future<Database> _initDB() async {
-    String path = join(await getDatabasesPath(), 'emoji.db');
+    String path = join(await getDatabasesPath(), 'sticker_share.db');
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute('''
-          CREATE TABLE emojis(
+          CREATE TABLE stickers(
             id TEXT PRIMARY KEY,
             name TEXT,
-            url TEXT,
             localPath TEXT,
-            categoryId TEXT,
-            createdAt TEXT,
+            themeId TEXT
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE themes(
+            id TEXT PRIMARY KEY,
+            name TEXT,
             isFavorite INTEGER
           )
         ''');
-        await db.execute('''
-          CREATE TABLE categories(
-            id TEXT PRIMARY KEY,
-            name TEXT,
-            icon TEXT
-          )
-        ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          // Drop old tables and create new ones
+          await db.execute('DROP TABLE IF EXISTS emojis');
+          await db.execute('DROP TABLE IF EXISTS categories');
+          
+          await db.execute('''
+            CREATE TABLE stickers(
+              id TEXT PRIMARY KEY,
+              name TEXT,
+              localPath TEXT,
+              themeId TEXT
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE themes(
+              id TEXT PRIMARY KEY,
+              name TEXT,
+              isFavorite INTEGER
+            )
+          ''');
+        }
       },
     );
   }
 
-  // Emoji operations
-  Future<List<EmojiModel>> getEmojis({String? categoryId}) async {
+  // Sticker operations
+  Future<List<StickerModel>> getStickers({String? themeId}) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
-      'emojis',
-      where: categoryId != null ? 'categoryId = ?' : null,
-      whereArgs: categoryId != null ? [categoryId] : null,
-      orderBy: 'createdAt DESC',
+      'stickers',
+      where: themeId != null ? 'themeId = ?' : null,
+      whereArgs: themeId != null ? [themeId] : null,
     );
-    return maps.map((map) => EmojiModel.fromMap(map)).toList();
+    return maps.map((map) => StickerModel.fromMap(map)).toList();
   }
 
-  Future<List<EmojiModel>> getFavoriteEmojis() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'emojis',
-      where: 'isFavorite = ?',
-      whereArgs: [1],
-      orderBy: 'createdAt DESC',
-    );
-    return maps.map((map) => EmojiModel.fromMap(map)).toList();
-  }
-
-  Future<void> insertEmoji(EmojiModel emoji) async {
+  Future<void> insertSticker(StickerModel sticker) async {
     final db = await database;
     await db.insert(
-      'emojis',
-      emoji.toMap(),
+      'stickers',
+      sticker.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
-  Future<void> updateEmoji(EmojiModel emoji) async {
-    final db = await database;
-    await db.update(
-      'emojis',
-      emoji.toMap(),
-      where: 'id = ?',
-      whereArgs: [emoji.id],
-    );
-  }
-
-  Future<void> deleteEmoji(String id) async {
+  Future<void> deleteSticker(String id) async {
     final db = await database;
     await db.delete(
-      'emojis',
+      'stickers',
       where: 'id = ?',
       whereArgs: [id],
     );
   }
 
-  Future<void> toggleFavorite(String id, bool isFavorite) async {
+  Future<void> deleteStickersByTheme(String themeId) async {
+    final db = await database;
+    await db.delete(
+      'stickers',
+      where: 'themeId = ?',
+      whereArgs: [themeId],
+    );
+  }
+
+  // Theme operations
+  Future<List<ThemeModel>> getThemes() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query('themes');
+    return maps.map((map) => ThemeModel.fromMap(map)).toList();
+  }
+
+  Future<List<ThemeModel>> getFavoriteThemes() async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'themes',
+      where: 'isFavorite = ?',
+      whereArgs: [1],
+    );
+    return maps.map((map) => ThemeModel.fromMap(map)).toList();
+  }
+
+  Future<void> insertTheme(ThemeModel theme) async {
+    final db = await database;
+    await db.insert(
+      'themes',
+      theme.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> updateTheme(ThemeModel theme) async {
     final db = await database;
     await db.update(
-      'emojis',
+      'themes',
+      theme.toMap(),
+      where: 'id = ?',
+      whereArgs: [theme.id],
+    );
+  }
+
+  Future<void> toggleThemeFavorite(String id, bool isFavorite) async {
+    final db = await database;
+    await db.update(
+      'themes',
       {'isFavorite': isFavorite ? 1 : 0},
       where: 'id = ?',
       whereArgs: [id],
     );
   }
 
-  // Category operations
-  Future<List<CategoryModel>> getCategories() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('categories');
-    return maps.map((map) => CategoryModel.fromMap(map)).toList();
-  }
-
-  Future<void> insertCategory(CategoryModel category) async {
-    final db = await database;
-    await db.insert(
-      'categories',
-      category.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-  }
-
-  Future<void> updateCategory(CategoryModel category) async {
-    final db = await database;
-    await db.update(
-      'categories',
-      category.toMap(),
-      where: 'id = ?',
-      whereArgs: [category.id],
-    );
-  }
-
-  Future<void> deleteCategory(String id) async {
+  Future<void> deleteTheme(String id) async {
     final db = await database;
     await db.delete(
-      'categories',
+      'themes',
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -139,7 +156,7 @@ class DatabaseService {
   // Clear all data
   Future<void> clearAllData() async {
     final db = await database;
-    await db.delete('emojis');
-    await db.delete('categories');
+    await db.delete('stickers');
+    await db.delete('themes');
   }
 }

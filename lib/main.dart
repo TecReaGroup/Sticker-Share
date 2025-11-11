@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'providers/emoji_provider.dart';
+import 'providers/sticker_provider.dart';
 import 'screens/home_screen.dart';
 
 void main() {
@@ -14,12 +14,12 @@ class StickerShareApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) {
-        final provider = EmojiProvider();
+        final provider = StickerProvider();
         provider.initialize();
         return provider;
       },
       child: MaterialApp(
-        title: '表情包管理',
+        title: 'Sticker Manager',
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
           useMaterial3: true,

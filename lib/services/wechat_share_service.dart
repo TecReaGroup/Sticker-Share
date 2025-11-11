@@ -1,13 +1,14 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class WeChatShareService {
   static const MethodChannel _channel =
       MethodChannel('com.stickershare/wechat_share');
 
-  /// 分享GIF到微信（保持动画）
-  /// [gifData] GIF文件的字节数据
-  /// [appId] 微信开放平台申请的AppID
-  /// [scene] 分享场景: 'session'(聊天), 'timeline'(朋友圈), 'favorite'(收藏)
+  /// Share GIF to WeChat (keep animation)
+  /// [gifData] GIF file byte data
+  /// [appId] AppID from WeChat Open Platform
+  /// [scene] Share scene: 'session'(chat), 'timeline'(moments), 'favorite'(favorites)
   static Future<bool> shareGifToWeChat({
     required Uint8List gifData,
     required String appId,
@@ -21,35 +22,35 @@ class WeChatShareService {
       });
       return result == true;
     } on PlatformException catch (e) {
-      print('分享失败: ${e.message}');
+      debugPrint('Share failed: ${e.message}');
       return false;
     } catch (e) {
-      print('分享失败: $e');
+      debugPrint('Share failed: $e');
       return false;
     }
   }
 
-  /// 检查微信是否安装
+  /// Check if WeChat is installed
   static Future<bool> isWeChatInstalled() async {
     try {
       final result = await _channel.invokeMethod('isWeChatInstalled');
       return result == true;
     } on PlatformException catch (e) {
-      print('检查微信安装状态失败: ${e.message}');
+      debugPrint('Failed to check WeChat installation: ${e.message}');
       return false;
     } catch (e) {
-      print('检查微信安装状态失败: $e');
+      debugPrint('Failed to check WeChat installation: $e');
       return false;
     }
   }
 
-  /// 获取微信版本（可选功能）
+  /// Get WeChat version (optional feature)
   static Future<String?> getWeChatVersion() async {
     try {
       final result = await _channel.invokeMethod('getWeChatVersion');
       return result as String?;
     } catch (e) {
-      print('获取微信版本失败: $e');
+      debugPrint('Failed to get WeChat version: $e');
       return null;
     }
   }

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../providers/emoji_provider.dart';
-import '../models/emoji_model.dart';
+import '../providers/sticker_provider.dart';
+import '../models/sticker_model.dart';
 import '../services/wechat_share_service.dart';
+import '../widgets/error_tolerant_gif_widget.dart';
 import 'package:flutter/services.dart';
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,82 +18,48 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // Initialize provider and load local test emojis
+    
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final provider = context.read<EmojiProvider>();
-      // Wait for provider to finish initializing from database
+      final provider = context.read<StickerProvider>();
       while (provider.isLoading) {
         await Future.delayed(const Duration(milliseconds: 50));
       }
-      await _loadLocalEmojis();
+      await provider.scanAndLoadAssets();
     });
-  }
-
-  Future<void> _loadLocalEmojis() async {
-    final provider = context.read<EmojiProvider>();
-    
-    // Check if emojis already exist in database
-    final existingEmojis = provider.emojis;
-    if (existingEmojis.isNotEmpty) {
-      return;
-    }
-    
-    // Load test emojis from assets only if database is empty
-    final testEmojis = [
-      EmojiModel(
-        id: '1',
-        name: 'discard',
-        url: 'assets/stickers/discard.gif',
-        localPath: 'assets/stickers/discard.gif',
-        categoryId: 'default',
-        createdAt: DateTime.now(),
-      ),
-      EmojiModel(
-        id: '2',
-        name: 'duck',
-        url: 'assets/stickers/duck.gif',
-        localPath: 'assets/stickers/duck.gif',
-        categoryId: 'default',
-        createdAt: DateTime.now(),
-      ),
-    ];
-
-    for (var emoji in testEmojis) {
-      await provider.addEmoji(emoji);
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('表情包管理'),
+        title: const Text('Sticker Management'),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: _ThemeSelector(),
+        ),
         actions: [
-          Consumer<EmojiProvider>(
+          Consumer<StickerProvider>(
             builder: (context, provider, child) {
-              final showingFavorites = provider.emojis.isNotEmpty &&
-                  provider.emojis.every((e) => e.isFavorite);
               return IconButton(
                 icon: Icon(
-                  showingFavorites ? Icons.favorite : Icons.favorite_border,
+                  provider.showFavoritesOnly 
+                      ? Icons.favorite 
+                      : Icons.favorite_border,
                 ),
                 onPressed: () {
-                  if (showingFavorites) {
-                    // If showing favorites, reload all emojis
-                    provider.loadEmojis();
-                  } else {
-                    // Otherwise, show only favorites
-                    provider.loadFavorites();
-                  }
+                  provider.toggleFavoritesFilter();
                 },
+                tooltip: provider.showFavoritesOnly
+                    ? 'Show All'
+                    : 'Favorites Only',
               );
             },
           ),
         ],
       ),
-      body: Consumer<EmojiProvider>(
+      body: Consumer<StickerProvider>(
         builder: (context, provider, child) {
           if (provider.isLoading) {
             return const Center(child: CircularProgressIndicator());
@@ -111,14 +79,16 @@ class _HomeScreenState extends State<HomeScreen> {
                       provider.clearError();
                       provider.initialize();
                     },
-                    child: const Text('重试'),
+                    child: const Text('Retry'),
                   ),
                 ],
               ),
             );
           }
 
-          if (provider.emojis.isEmpty) {
+          final stickers = provider.filteredStickers;
+
+          if (stickers.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -126,11 +96,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   const Icon(Icons.sentiment_dissatisfied,
                       size: 64, color: Colors.grey),
                   const SizedBox(height: 16),
-                  const Text('暂无表情包', style: TextStyle(fontSize: 16)),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _loadLocalEmojis,
-                    child: const Text('加载测试表情包'),
+                  Text(
+                    provider.showFavoritesOnly
+                        ? 'No favorite themes'
+                        : 'No stickers',
+                    style: const TextStyle(fontSize: 16),
                   ),
                 ],
               ),
@@ -138,6 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
           }
 
           return GridView.builder(
+            key: ValueKey('grid_${provider.selectedThemeId}_${provider.showFavoritesOnly}'),
             padding: const EdgeInsets.all(8),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
@@ -145,10 +116,10 @@ class _HomeScreenState extends State<HomeScreen> {
               mainAxisSpacing: 8,
               childAspectRatio: 1,
             ),
-            itemCount: provider.emojis.length,
+            itemCount: stickers.length,
             itemBuilder: (context, index) {
-              final emoji = provider.emojis[index];
-              return _EmojiCard(emoji: emoji);
+              final sticker = stickers[index];
+              return _StickerCard(sticker: sticker);
             },
           );
         },
@@ -157,73 +128,131 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _EmojiCard extends StatelessWidget {
-  final EmojiModel emoji;
+class _ThemeSelector extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<StickerProvider>(
+      builder: (context, provider, child) {
+        final themes = provider.showFavoritesOnly 
+            ? provider.favoriteThemes 
+            : provider.themes;
 
-  const _EmojiCard({required this.emoji});
+        if (themes.isEmpty) {
+          return const SizedBox(height: 60);
+        }
 
+        return Container(
+          height: 60,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            itemCount: themes.length,
+            itemBuilder: (context, index) {
+              final theme = themes[index];
+              final isSelected = provider.selectedThemeId == theme.id;
+              
+              return GestureDetector(
+                onTap: () {
+                  // Only allow switching to a different theme
+                  provider.selectTheme(theme.id);
+                },
+                onLongPress: () {
+                  provider.toggleThemeFavorite(theme.id);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        theme.isFavorite ? 'Theme unfavorited' : 'Theme favorited',
+                      ),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                },
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isSelected 
+                        ? Colors.white 
+                        : Colors.white.withAlpha(70),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected ? Colors.white : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (theme.isFavorite)
+                        const Padding(
+                          padding: EdgeInsets.only(right: 4),
+                          child: Icon(
+                            Icons.favorite,
+                            size: 16,
+                            color: Colors.red,
+                          ),
+                        ),
+                      Text(
+                        theme.name,
+                        style: TextStyle(
+                          color: isSelected 
+                              ? Colors.blue 
+                              : Colors.white,
+                          fontWeight: isSelected 
+                              ? FontWeight.bold 
+                              : FontWeight.normal,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _StickerCard extends StatefulWidget {
+  final StickerModel sticker;
+
+  const _StickerCard({
+    required this.sticker,
+  });
+
+  @override
+  State<_StickerCard> createState() => _StickerCardState();
+}
+
+class _StickerCardState extends State<_StickerCard> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => _showShareDialog(context, emoji),
-      onLongPress: () => _showOptionsDialog(context, emoji),
+      onTap: () => _showShareDialog(context, widget.sticker),
       child: Card(
         elevation: 4,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Stack(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.asset(
-                emoji.localPath,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey[300],
-                    child: const Icon(Icons.error, size: 48),
-                  );
-                },
-              ),
-            ),
-            Positioned(
-              top: 4,
-              right: 4,
-              child: Consumer<EmojiProvider>(
-                builder: (context, provider, child) {
-                  final currentEmoji = provider.emojis
-                      .firstWhere((e) => e.id == emoji.id);
-                  final isFavorite = currentEmoji.isFavorite;
-                  return GestureDetector(
-                    onTap: () {
-                      provider.toggleFavorite(emoji.id);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.black45,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        isFavorite ? Icons.favorite : Icons.favorite_border,
-                        color: isFavorite ? Colors.red : Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: ErrorTolerantGifWidget(
+            assetPath: widget.sticker.localPath,
+            stickerName: widget.sticker.name,
+            fit: BoxFit.cover,
+          ),
         ),
       ),
     );
   }
 
-  void _showShareDialog(BuildContext context, EmojiModel emoji) {
+  void _showShareDialog(BuildContext context, StickerModel sticker) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -236,17 +265,17 @@ class _EmojiCard extends StatelessWidget {
           children: [
             ListTile(
               leading: const Icon(Icons.wechat, color: Colors.green, size: 32),
-              title: const Text('分享到微信'),
-              subtitle: const Text('保持GIF动画效果'),
+              title: const Text('Share to WeChat'),
+              subtitle: const Text('Preserve GIF animation'),
               onTap: () async {
                 Navigator.pop(context);
-                await _shareToWeChat(context, emoji);
+                await _shareToWeChat(context, sticker);
               },
             ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.share, color: Colors.blue, size: 32),
-              title: const Text('分享到其他应用'),
+              title: const Text('Share to other apps'),
               onTap: () {
                 Navigator.pop(context);
                 _showComingSoon(context);
@@ -258,51 +287,18 @@ class _EmojiCard extends StatelessWidget {
     );
   }
 
-  void _showOptionsDialog(BuildContext context, EmojiModel emoji) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.favorite, color: Colors.red),
-              title: Text(emoji.isFavorite ? '取消收藏' : '添加收藏'),
-              onTap: () {
-                Navigator.pop(context);
-                context.read<EmojiProvider>().toggleFavorite(emoji.id);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('删除'),
-              onTap: () {
-                Navigator.pop(context);
-                _confirmDelete(context, emoji);
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _shareToWeChat(BuildContext context, EmojiModel emoji) async {
+  Future<void> _shareToWeChat(BuildContext context, StickerModel sticker) async {
     try {
-      // 检查微信是否安装
+      // Check if WeChat is installed
       final isInstalled = await WeChatShareService.isWeChatInstalled();
       if (!isInstalled) {
         if (context.mounted) {
-          _showError(context, '未安装微信，请先安装微信应用');
+          _showError(context, 'WeChat not installed');
         }
         return;
       }
 
-      // 显示加载对话框
+      // Show loading dialog
       if (context.mounted) {
         showDialog(
           context: context,
@@ -313,74 +309,48 @@ class _EmojiCard extends StatelessWidget {
         );
       }
 
-      // 读取GIF文件
-      final ByteData data = await rootBundle.load(emoji.localPath);
+      // Read GIF file
+      final ByteData data = await rootBundle.load(sticker.localPath);
       final Uint8List gifData = data.buffer.asUint8List();
 
-      // 关闭加载对话框
+      // Close loading dialog
       if (context.mounted) {
         Navigator.pop(context);
       }
 
-      // 分享到微信 (需要替换为真实的AppID)
+      // Share to WeChat (replace with real AppID)
       final success = await WeChatShareService.shareGifToWeChat(
         gifData: gifData,
-        appId: 'YOUR_WECHAT_APPID', // TODO: 替换为真实的微信AppID
+        appId: 'YOUR_WECHAT_APPID',
       );
 
       if (context.mounted) {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('正在跳转到微信...')),
+            const SnackBar(content: Text('Opening WeChat...')),
           );
         } else {
-          _showError(context, '分享失败，请重试');
+          _showError(context, 'Share failed, please retry');
         }
       }
     } catch (e) {
       if (context.mounted) {
         Navigator.of(context, rootNavigator: true).pop();
-        _showError(context, '分享失败: $e');
+        _showError(context, 'Share failed: $e');
       }
     }
-  }
-
-  void _confirmDelete(BuildContext context, EmojiModel emoji) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认删除'),
-        content: Text('确定要删除表情包 "${emoji.name}" 吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.read<EmojiProvider>().deleteEmoji(emoji.id);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('已删除')),
-              );
-            },
-            child: const Text('删除', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
   }
 
   void _showError(BuildContext context, String message) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('错误'),
+        title: const Text('Error'),
         content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('确定'),
+            child: const Text('OK'),
           ),
         ],
       ),
@@ -389,7 +359,7 @@ class _EmojiCard extends StatelessWidget {
 
   void _showComingSoon(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('功能即将上线')),
+      const SnackBar(content: Text('Coming soon')),
     );
   }
 }
