@@ -24,14 +24,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final provider = context.read<StickerProvider>();
-      while (provider.isLoading) {
-        await Future.delayed(const Duration(milliseconds: 50));
-      }
-      await provider.scanAndLoadAssets();
-    });
+    // Data is already preloaded in splash screen, no need to load again
   }
 
   bool _handleScrollNotification(ScrollNotification notification) {
@@ -101,7 +94,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ElevatedButton(
                     onPressed: () {
                       provider.clearError();
-                      provider.initialize();
+                      provider.scanAndLoadAssets();
                     },
                     child: const Text('Retry'),
                   ),

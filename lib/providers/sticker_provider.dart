@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/sticker_model.dart';
 import '../models/theme_model.dart';
 import '../services/database_service.dart';
@@ -194,34 +196,32 @@ class StickerProvider with ChangeNotifier {
   Future<void> scanAndLoadAssets() async {
     try {
       debugPrint('Starting asset scan...');
-      // List only files that exist in the GIF directory
-      final stickersData = {
-        'DonutTheDog': [
-          '40+face_joy_of_tears', '41+hand_wave_waving', '42+hand_ok',
-          '43++1_thumbs_thumbsup_up', '44+a_blowing_face_heart_kiss_kissing',
-          '45+face_fearful', '46+heart_red', '47+star_struck',
-          '48+face_hearts_smiling_three', '49+1_down_thumbs_thumbsdown',
-          '50+face_horns_imp_smiling', '51+face_partying', '52+angry_face',
-          '53+face_smiling_sunglasses', '54+hand_v_victory', '55+eyes',
-          '56+face_hands_hugging_hugs_open_smiling', '57+face_thinking',
-          '58+hankey_of_pile_poo_poop_shit', '59+crying_face_loudly_sob',
-          '60+face_sleepy', '61+crossed_dizzy_eyes_face_knocked_out',
-          '62+biceps_flexed_muscle', '63+face_pleading', '64+face_out_stuck_tongue',
-          '65+rose', '66+gesturing_good_man_ng_no', '67+face_hot',
-          '68+face_sleeping', '69+biceps_flexed_muscle', '70++1_thumbs_thumbsup_up',
-        ],
-        'LovelyPeachy': [
-          '71+face_joy_of_tears', '72+hand_wave_waving', '73+broken_heart',
-          '74+face_fearful', '75+a_blowing_face_heart_kiss_kissing',
-          '76++1_thumbs_thumbsup_up', '77+gesturing_good_no_person',
-          '78+face_vomiting', '79+extended_finger_fu_hand_middle_reversed',
-          '80+gift_wrapped', '81+face_horns_imp_smiling', '82+down_face_upside',
-          '83+face_flushed', '84+facepalming_man', '85+star_struck',
-          '86+drooling_face', '87+face_sleeping', '88+enraged_face_pout_rage',
-          '89+face_hearts_smiling_three', '90+crossed_dizzy_eyes_face_knocked_out',
-          '91+star_struck', '92+crying_face_loudly_sob', '93+face_partying',
-        ],
-      };
+      
+      // Load AssetManifest.json to get all asset paths
+      final manifestContent = await rootBundle.loadString('AssetManifest.json');
+      final Map<String, dynamic> manifestMap = json.decode(manifestContent);
+      
+      // Parse asset paths to extract theme names and sticker file names
+      final Map<String, Set<String>> stickersData = {};
+      final RegExp stickerPattern = RegExp(
+        r'assets/stickers/([^/]+)/lottie/(.+)\.json$'
+      );
+      
+      for (final assetPath in manifestMap.keys) {
+        final match = stickerPattern.firstMatch(assetPath);
+        if (match != null) {
+          final themeName = match.group(1)!;
+          final fileName = match.group(2)!;
+          
+          stickersData.putIfAbsent(themeName, () => <String>{});
+          stickersData[themeName]!.add(fileName);
+        }
+      }
+      
+      debugPrint('Found ${stickersData.length} themes from AssetManifest.json');
+      for (final entry in stickersData.entries) {
+        debugPrint('Theme: ${entry.key}, Stickers: ${entry.value.length}');
+      }
       
       for (final entry in stickersData.entries) {
         final themeFolder = entry.key;
