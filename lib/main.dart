@@ -13,7 +13,11 @@ class StickerShareApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (_) => EmojiProvider(),
+      create: (_) {
+        final provider = EmojiProvider();
+        provider.initialize();
+        return provider;
+      },
       child: MaterialApp(
         title: '表情包管理',
         theme: ThemeData(

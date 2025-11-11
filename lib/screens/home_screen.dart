@@ -17,15 +17,26 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     // Initialize provider and load local test emojis
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadLocalEmojis();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final provider = context.read<EmojiProvider>();
+      // Wait for provider to finish initializing from database
+      while (provider.isLoading) {
+        await Future.delayed(const Duration(milliseconds: 50));
+      }
+      await _loadLocalEmojis();
     });
   }
 
   Future<void> _loadLocalEmojis() async {
     final provider = context.read<EmojiProvider>();
     
-    // Load test emojis from assets
+    // Check if emojis already exist in database
+    final existingEmojis = provider.emojis;
+    if (existingEmojis.isNotEmpty) {
+      return;
+    }
+    
+    // Load test emojis from assets only if database is empty
     final testEmojis = [
       EmojiModel(
         id: '1',
@@ -58,10 +69,24 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.favorite),
-            onPressed: () {
-              context.read<EmojiProvider>().loadFavorites();
+          Consumer<EmojiProvider>(
+            builder: (context, provider, child) {
+              final showingFavorites = provider.emojis.isNotEmpty &&
+                  provider.emojis.every((e) => e.isFavorite);
+              return IconButton(
+                icon: Icon(
+                  showingFavorites ? Icons.favorite : Icons.favorite_border,
+                ),
+                onPressed: () {
+                  if (showingFavorites) {
+                    // If showing favorites, reload all emojis
+                    provider.loadEmojis();
+                  } else {
+                    // Otherwise, show only favorites
+                    provider.loadFavorites();
+                  }
+                },
+              );
             },
           ),
         ],
@@ -169,9 +194,9 @@ class _EmojiCard extends StatelessWidget {
               right: 4,
               child: Consumer<EmojiProvider>(
                 builder: (context, provider, child) {
-                  final isFavorite = provider.emojis
-                      .firstWhere((e) => e.id == emoji.id)
-                      .isFavorite;
+                  final currentEmoji = provider.emojis
+                      .firstWhere((e) => e.id == emoji.id);
+                  final isFavorite = currentEmoji.isFavorite;
                   return GestureDetector(
                     onTap: () {
                       provider.toggleFavorite(emoji.id);
