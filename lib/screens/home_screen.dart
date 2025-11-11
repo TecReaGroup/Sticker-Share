@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:lottie/lottie.dart';
 import '../providers/sticker_provider.dart';
 import '../models/sticker_model.dart';
 import '../services/wechat_share_service.dart';
-import '../widgets/error_tolerant_gif_widget.dart';
 import 'package:flutter/services.dart';
 
 
@@ -242,10 +242,19 @@ class _StickerCardState extends State<_StickerCard> {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: ErrorTolerantGifWidget(
-            assetPath: widget.sticker.localPath,
-            stickerName: widget.sticker.name,
+          child: Lottie.asset(
+            widget.sticker.localPath,
             fit: BoxFit.cover,
+            frameRate: FrameRate.max,
+            errorBuilder: (context, error, stackTrace) {
+              debugPrint('Lottie error for ${widget.sticker.localPath}: $error');
+              return Container(
+                color: Colors.grey[300],
+                child: const Center(
+                  child: Icon(Icons.error_outline, color: Colors.grey, size: 48),
+                ),
+              );
+            },
           ),
         ),
       ),
@@ -309,8 +318,8 @@ class _StickerCardState extends State<_StickerCard> {
         );
       }
 
-      // Read GIF file
-      final ByteData data = await rootBundle.load(sticker.localPath);
+      // Read GIF file for WeChat sharing
+      final ByteData data = await rootBundle.load(sticker.gifPath);
       final Uint8List gifData = data.buffer.asUint8List();
 
       // Close loading dialog

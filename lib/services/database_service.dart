@@ -16,13 +16,14 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'sticker_share.db');
     return await openDatabase(
       path,
-      version: 2,
+      version: 4,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE stickers(
             id TEXT PRIMARY KEY,
             name TEXT,
             localPath TEXT,
+            gifPath TEXT,
             themeId TEXT
           )
         ''');
@@ -35,27 +36,28 @@ class DatabaseService {
         ''');
       },
       onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 2) {
-          // Drop old tables and create new ones
-          await db.execute('DROP TABLE IF EXISTS emojis');
-          await db.execute('DROP TABLE IF EXISTS categories');
-          
-          await db.execute('''
-            CREATE TABLE stickers(
-              id TEXT PRIMARY KEY,
-              name TEXT,
-              localPath TEXT,
-              themeId TEXT
-            )
-          ''');
-          await db.execute('''
-            CREATE TABLE themes(
-              id TEXT PRIMARY KEY,
-              name TEXT,
-              isFavorite INTEGER
-            )
-          ''');
-        }
+        // Always drop and recreate for clean slate
+        await db.execute('DROP TABLE IF EXISTS stickers');
+        await db.execute('DROP TABLE IF EXISTS themes');
+        await db.execute('DROP TABLE IF EXISTS emojis');
+        await db.execute('DROP TABLE IF EXISTS categories');
+        
+        await db.execute('''
+          CREATE TABLE stickers(
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            localPath TEXT,
+            gifPath TEXT,
+            themeId TEXT
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE themes(
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            isFavorite INTEGER
+          )
+        ''');
       },
     );
   }

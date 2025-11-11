@@ -64,8 +64,9 @@ class StickerProvider with ChangeNotifier {
       if (_themes.isNotEmpty && _selectedThemeId == null) {
         _selectedThemeId = _themes.first.id;
       }
-    } catch (e) {
-      _error = e.toString();
+    } catch (e, stackTrace) {
+      _error = 'Initialize error: $e';
+      debugPrint('Initialize error: $e\n$stackTrace');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -192,32 +193,72 @@ class StickerProvider with ChangeNotifier {
   // Scan assets directory and load themes/stickers
   Future<void> scanAndLoadAssets() async {
     try {
-      final themeFolders = ['DonutTheDog', 'LovelyPeachy'];
+      debugPrint('Starting asset scan...');
+      // List only files that exist in the GIF directory
+      final stickersData = {
+        'DonutTheDog': [
+          '40+face_joy_of_tears', '41+hand_wave_waving', '42+hand_ok',
+          '43++1_thumbs_thumbsup_up', '44+a_blowing_face_heart_kiss_kissing',
+          '45+face_fearful', '46+heart_red', '47+star_struck',
+          '48+face_hearts_smiling_three', '49+1_down_thumbs_thumbsdown',
+          '50+face_horns_imp_smiling', '51+face_partying', '52+angry_face',
+          '53+face_smiling_sunglasses', '54+hand_v_victory', '55+eyes',
+          '56+face_hands_hugging_hugs_open_smiling', '57+face_thinking',
+          '58+hankey_of_pile_poo_poop_shit', '59+crying_face_loudly_sob',
+          '60+face_sleepy', '61+crossed_dizzy_eyes_face_knocked_out',
+          '62+biceps_flexed_muscle', '63+face_pleading', '64+face_out_stuck_tongue',
+          '65+rose', '66+gesturing_good_man_ng_no', '67+face_hot',
+          '68+face_sleeping', '69+biceps_flexed_muscle', '70++1_thumbs_thumbsup_up',
+        ],
+        'LovelyPeachy': [
+          '71+face_joy_of_tears', '72+hand_wave_waving', '73+broken_heart',
+          '74+face_fearful', '75+a_blowing_face_heart_kiss_kissing',
+          '76++1_thumbs_thumbsup_up', '77+gesturing_good_no_person',
+          '78+face_vomiting', '79+extended_finger_fu_hand_middle_reversed',
+          '80+gift_wrapped', '81+face_horns_imp_smiling', '82+down_face_upside',
+          '83+face_flushed', '84+facepalming_man', '85+star_struck',
+          '86+drooling_face', '87+face_sleeping', '88+enraged_face_pout_rage',
+          '89+face_hearts_smiling_three', '90+crossed_dizzy_eyes_face_knocked_out',
+          '91+star_struck', '92+crying_face_loudly_sob', '93+face_partying',
+        ],
+      };
       
-      for (final themeFolder in themeFolders) {
-        // Check if theme already exists in database
+      for (final entry in stickersData.entries) {
+        final themeFolder = entry.key;
+        final fileNames = entry.value;
+        
+        debugPrint('Processing theme: $themeFolder');
         final dbThemes = await _databaseService.getThemes();
-        final existingTheme = dbThemes.where((t) => t.id == themeFolder).firstOrNull;
-        if (existingTheme == null) {
-          final theme = ThemeModel(
+        if (!dbThemes.any((t) => t.id == themeFolder)) {
+          await _databaseService.insertTheme(ThemeModel(
             id: themeFolder,
             name: themeFolder,
             isFavorite: false,
-          );
-          await _databaseService.insertTheme(theme);
+          ));
         }
 
-        // Check if stickers for this theme already exist in database
         final dbStickers = await _databaseService.getStickers(themeId: themeFolder);
-        if (dbStickers.isEmpty) {
-          final gifPaths = await _getGifPathsForTheme(themeFolder);
-          for (final gifPath in gifPaths) {
-            final fileName = gifPath.split('/').last;
-            final stickerId = '${themeFolder}_${fileName.replaceAll('.gif', '')}';
+        
+        // Check if we need to update old records (those not pointing to Lottie JSON)
+        final needsUpdate = dbStickers.any((s) => !s.localPath.endsWith('.json'));
+        
+        if (dbStickers.isEmpty || needsUpdate) {
+          // Delete old stickers for this theme
+          if (needsUpdate) {
+            debugPrint('Updating old stickers for $themeFolder');
+            for (final oldSticker in dbStickers) {
+              await _databaseService.deleteSticker(oldSticker.id);
+            }
+          }
+          
+          debugPrint('Adding ${fileNames.length} stickers for $themeFolder');
+          for (final fileName in fileNames) {
+            // Use Lottie JSON for preview, GIF for WeChat sharing
             final sticker = StickerModel(
-              id: stickerId,
-              name: fileName.replaceAll('.gif', ''),
-              localPath: gifPath,
+              id: '${themeFolder}_$fileName',
+              name: fileName,
+              localPath: 'assets/stickers/$themeFolder/lottie/$fileName.json',
+              gifPath: 'assets/stickers/$themeFolder/gif/$fileName.gif',
               themeId: themeFolder,
             );
             await _databaseService.insertSticker(sticker);
@@ -225,74 +266,19 @@ class StickerProvider with ChangeNotifier {
         }
       }
       
-      // After scanning, reload all data from database
+      debugPrint('Loading themes and stickers...');
       await loadThemes();
       await loadStickers();
       
-      // Auto-select first theme if none is selected
+      debugPrint('Loaded ${_themes.length} themes and ${_stickers.length} stickers');
+      
       if (_themes.isNotEmpty && _selectedThemeId == null) {
         _selectedThemeId = _themes.first.id;
       }
-      
-    } catch (e) {
+    } catch (e, stackTrace) {
       _error = 'Failed to scan assets: $e';
+      debugPrint('Scan error: $e\n$stackTrace');
       notifyListeners();
     }
-  }
-
-  Future<List<String>> _getGifPathsForTheme(String themeName) async {
-    // Return actual GIF file paths from assets directory
-    if (themeName == 'DonutTheDog') {
-      return [
-        'assets/stickers/DonutTheDog/gif/41+hand_wave_waving.gif',
-        'assets/stickers/DonutTheDog/gif/42+hand_ok.gif',
-        'assets/stickers/DonutTheDog/gif/43++1_thumbs_thumbsup_up.gif',
-        'assets/stickers/DonutTheDog/gif/44+a_blowing_face_heart_kiss_kissing.gif',
-        'assets/stickers/DonutTheDog/gif/45+face_fearful.gif',
-        'assets/stickers/DonutTheDog/gif/46+heart_red.gif',
-        'assets/stickers/DonutTheDog/gif/47+star_struck.gif',
-        'assets/stickers/DonutTheDog/gif/48+face_hearts_smiling_three.gif',
-        'assets/stickers/DonutTheDog/gif/49+1_down_thumbs_thumbsdown.gif',
-        'assets/stickers/DonutTheDog/gif/50+face_horns_imp_smiling.gif',
-        'assets/stickers/DonutTheDog/gif/51+face_partying.gif',
-        'assets/stickers/DonutTheDog/gif/52+angry_face.gif',
-        'assets/stickers/DonutTheDog/gif/53+face_smiling_sunglasses.gif',
-        'assets/stickers/DonutTheDog/gif/54+hand_v_victory.gif',
-        'assets/stickers/DonutTheDog/gif/55+eyes.gif',
-        'assets/stickers/DonutTheDog/gif/56+face_hands_hugging_hugs_open_smiling.gif',
-        'assets/stickers/DonutTheDog/gif/57+face_thinking.gif',
-        'assets/stickers/DonutTheDog/gif/58+hankey_of_pile_poo_poop_shit.gif',
-        'assets/stickers/DonutTheDog/gif/59+crying_face_loudly_sob.gif',
-        'assets/stickers/DonutTheDog/gif/60+face_sleepy.gif',
-        'assets/stickers/DonutTheDog/gif/61+crossed_dizzy_eyes_face_knocked_out.gif',
-      ];
-    } else if (themeName == 'LovelyPeachy') {
-      return [
-        'assets/stickers/LovelyPeachy/gif/71+face_joy_of_tears.gif',
-        'assets/stickers/LovelyPeachy/gif/72+hand_wave_waving.gif',
-        'assets/stickers/LovelyPeachy/gif/73+broken_heart.gif',
-        'assets/stickers/LovelyPeachy/gif/74+face_fearful.gif',
-        'assets/stickers/LovelyPeachy/gif/75+a_blowing_face_heart_kiss_kissing.gif',
-        'assets/stickers/LovelyPeachy/gif/76++1_thumbs_thumbsup_up.gif',
-        'assets/stickers/LovelyPeachy/gif/77+gesturing_good_no_person.gif',
-        'assets/stickers/LovelyPeachy/gif/78+face_vomiting.gif',
-        'assets/stickers/LovelyPeachy/gif/79+extended_finger_fu_hand_middle_reversed.gif',
-        'assets/stickers/LovelyPeachy/gif/80+gift_wrapped.gif',
-        'assets/stickers/LovelyPeachy/gif/81+face_horns_imp_smiling.gif',
-        'assets/stickers/LovelyPeachy/gif/82+down_face_upside.gif',
-        'assets/stickers/LovelyPeachy/gif/83+face_flushed.gif',
-        'assets/stickers/LovelyPeachy/gif/84+facepalming_man.gif',
-        'assets/stickers/LovelyPeachy/gif/85+star_struck.gif',
-        'assets/stickers/LovelyPeachy/gif/86+drooling_face.gif',
-        'assets/stickers/LovelyPeachy/gif/87+face_sleeping.gif',
-        'assets/stickers/LovelyPeachy/gif/88+enraged_face_pout_rage.gif',
-        'assets/stickers/LovelyPeachy/gif/89+face_hearts_smiling_three.gif',
-        'assets/stickers/LovelyPeachy/gif/90+crossed_dizzy_eyes_face_knocked_out.gif',
-        'assets/stickers/LovelyPeachy/gif/91+star_struck.gif',
-        'assets/stickers/LovelyPeachy/gif/92+crying_face_loudly_sob.gif',
-        'assets/stickers/LovelyPeachy/gif/93+face_partying.gif',
-      ];
-    }
-    return [];
   }
 }
