@@ -7,7 +7,6 @@ import '../models/sticker_model.dart';
 import '../services/wechat_share_service.dart';
 import 'package:flutter/services.dart';
 
-
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -18,8 +17,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _scrollController = ScrollController();
   bool _isScrolling = false;
-  bool _isFingerDown = false;  // Track if finger is touching the screen
-  Timer? _resumeAnimationTimer;  // Timer for delayed animation resume
+  bool _isFingerDown = false; // Track if finger is touching the screen
+  Timer? _resumeAnimationTimer; // Timer for delayed animation resume
 
   @override
   void initState() {
@@ -34,7 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() => _isScrolling = true);
       }
     }
-    
+
     return false;
   }
 
@@ -61,8 +60,8 @@ class _HomeScreenState extends State<HomeScreen> {
             builder: (context, provider, child) {
               return IconButton(
                 icon: Icon(
-                  provider.showFavoritesOnly 
-                      ? Icons.favorite 
+                  provider.showFavoritesOnly
+                      ? Icons.favorite
                       : Icons.favorite_border,
                 ),
                 onPressed: () {
@@ -110,8 +109,11 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.sentiment_dissatisfied,
-                      size: 64, color: Colors.grey),
+                  const Icon(
+                    Icons.sentiment_dissatisfied,
+                    size: 64,
+                    color: Colors.grey,
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     provider.showFavoritesOnly
@@ -140,21 +142,26 @@ class _HomeScreenState extends State<HomeScreen> {
               setState(() {
                 _isFingerDown = false;
               });
-              
+
               // Schedule animation resume after delay (150ms)
               // This prevents flicker on quick swipes while still being responsive
               _resumeAnimationTimer?.cancel();
-              _resumeAnimationTimer = Timer(const Duration(milliseconds: 100), () {
-                if (mounted && !_isFingerDown) {
-                  setState(() => _isScrolling = false);
-                }
-              });
+              _resumeAnimationTimer = Timer(
+                const Duration(milliseconds: 100),
+                () {
+                  if (mounted && !_isFingerDown) {
+                    setState(() => _isScrolling = false);
+                  }
+                },
+              );
             },
             child: NotificationListener<ScrollNotification>(
               onNotification: _handleScrollNotification,
               child: GridView.builder(
                 controller: _scrollController,
-                key: ValueKey('grid_${provider.selectedThemeId}_${provider.showFavoritesOnly}'),
+                key: ValueKey(
+                  'grid_${provider.selectedThemeId}_${provider.showFavoritesOnly}',
+                ),
                 padding: const EdgeInsets.all(8),
                 physics: const BouncingScrollPhysics(
                   parent: AlwaysScrollableScrollPhysics(),
@@ -187,8 +194,8 @@ class _ThemeSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<StickerProvider>(
       builder: (context, provider, child) {
-        final themes = provider.showFavoritesOnly 
-            ? provider.favoriteThemes 
+        final themes = provider.showFavoritesOnly
+            ? provider.favoriteThemes
             : provider.themes;
 
         if (themes.isEmpty) {
@@ -205,7 +212,7 @@ class _ThemeSelector extends StatelessWidget {
             itemBuilder: (context, index) {
               final theme = themes[index];
               final isSelected = provider.selectedThemeId == theme.id;
-              
+
               return GestureDetector(
                 onTap: () {
                   // Only allow switching to a different theme
@@ -216,7 +223,9 @@ class _ThemeSelector extends StatelessWidget {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
-                        theme.isFavorite ? 'Theme unfavorited' : 'Theme favorited',
+                        theme.isFavorite
+                            ? 'Theme unfavorited'
+                            : 'Theme favorited',
                       ),
                       duration: const Duration(seconds: 1),
                     ),
@@ -229,8 +238,8 @@ class _ThemeSelector extends StatelessWidget {
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
-                    color: isSelected 
-                        ? Colors.white 
+                    color: isSelected
+                        ? Colors.white
                         : Colors.white.withAlpha(70),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
@@ -253,11 +262,9 @@ class _ThemeSelector extends StatelessWidget {
                       Text(
                         theme.name,
                         style: TextStyle(
-                          color: isSelected 
-                              ? Colors.blue 
-                              : Colors.white,
-                          fontWeight: isSelected 
-                              ? FontWeight.bold 
+                          color: isSelected ? Colors.blue : Colors.white,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
                               : FontWeight.normal,
                         ),
                       ),
@@ -277,43 +284,126 @@ class _StickerCard extends StatefulWidget {
   final StickerModel sticker;
   final bool isScrolling;
 
-  const _StickerCard({
-    required this.sticker,
-    required this.isScrolling,
-  });
+  const _StickerCard({required this.sticker, required this.isScrolling});
 
   @override
   State<_StickerCard> createState() => _StickerCardState();
 }
 
-class _StickerCardState extends State<_StickerCard> {
+class _StickerCardState extends State<_StickerCard>
+    with TickerProviderStateMixin {
+  AnimationController? _lottieController;
+  late AnimationController _fadeController;
+  LottieComposition? _composition;
+  bool _isLottieLoaded = false;
+  bool _isDisposed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    
+    // Controller for fade-in transition
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+    
+    // Load composition asynchronously
+    _loadComposition();
+  }
+  
+  Future<void> _loadComposition() async {
+    try {
+      final composition = await AssetLottie(widget.sticker.localPath).load();
+      
+      if (mounted && !_isDisposed) {
+        // Create controller with composition duration
+        _lottieController = AnimationController(
+          vsync: this,
+          duration: composition.duration,
+        );
+        
+        // Start animation only if not scrolling
+        if (!widget.isScrolling) {
+          _lottieController!.repeat();
+        }
+        
+        setState(() {
+          _composition = composition;
+          _isLottieLoaded = true;
+        });
+        
+        // Start fade-in animation
+        _fadeController.forward();
+      }
+    } catch (e) {
+      debugPrint('Error loading Lottie: $e');
+      if (mounted && !_isDisposed) {
+        setState(() => _isLottieLoaded = true);
+      }
+    }
+  }
+
+  @override
+  void didUpdateWidget(_StickerCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Handle scroll state changes to pause/resume animation
+    if (_lottieController != null &&
+        widget.isScrolling != oldWidget.isScrolling) {
+      if (widget.isScrolling) {
+        _lottieController!.stop();
+      } else {
+        _lottieController!.repeat();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    _lottieController?.dispose();
+    _fadeController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => _showShareDialog(context, widget.sticker),
       child: Card(
         elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Lottie.asset(
-            widget.sticker.localPath,
-            fit: BoxFit.cover,
-            repeat: true,
-            animate: !widget.isScrolling,
-            frameRate: FrameRate(60),
-            renderCache: RenderCache.raster,
-            errorBuilder: (context, error, stackTrace) {
-              debugPrint('Lottie error for ${widget.sticker.localPath}: $error');
-              return Container(
-                color: Colors.grey[300],
-                child: const Center(
-                  child: Icon(Icons.error_outline, color: Colors.grey, size: 48),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Main Lottie animation with fade-in (no placeholder)
+              if (_composition != null && _lottieController != null)
+                FadeTransition(
+                  opacity: _fadeController,
+                  child: Lottie(
+                    composition: _composition,
+                    controller: _lottieController,
+                    fit: BoxFit.cover,
+                    frameRate: FrameRate(60),
+                  ),
                 ),
-              );
-            },
+              
+              // Error state
+              if (_isLottieLoaded && _composition == null)
+                Container(
+                  color: Colors.grey[300],
+                  child: const Center(
+                    child: Icon(
+                      Icons.error_outline,
+                      color: Colors.grey,
+                      size: 48,
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
@@ -355,7 +445,10 @@ class _StickerCardState extends State<_StickerCard> {
     );
   }
 
-  Future<void> _shareToWeChat(BuildContext context, StickerModel sticker) async {
+  Future<void> _shareToWeChat(
+    BuildContext context,
+    StickerModel sticker,
+  ) async {
     try {
       // Check if WeChat is installed
       final isInstalled = await WeChatShareService.isWeChatInstalled();
@@ -371,9 +464,8 @@ class _StickerCardState extends State<_StickerCard> {
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => const Center(
-            child: CircularProgressIndicator(),
-          ),
+          builder: (context) =>
+              const Center(child: CircularProgressIndicator()),
         );
       }
 
@@ -394,9 +486,9 @@ class _StickerCardState extends State<_StickerCard> {
 
       if (context.mounted) {
         if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Opening WeChat...')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Opening WeChat...')));
         } else {
           _showError(context, 'Share failed, please retry');
         }
@@ -426,8 +518,9 @@ class _StickerCardState extends State<_StickerCard> {
   }
 
   void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Coming soon')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Coming soon')));
   }
 }
+

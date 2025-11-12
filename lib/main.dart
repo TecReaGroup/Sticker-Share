@@ -5,39 +5,71 @@ import 'screens/home_screen.dart';
 import 'screens/splash_screen.dart';
 
 void main() {
+  // Ensure Flutter binding is initialized
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const StickerShareApp());
 }
 
-class StickerShareApp extends StatefulWidget {
+class StickerShareApp extends StatelessWidget {
   const StickerShareApp({super.key});
 
   @override
-  State<StickerShareApp> createState() => _StickerShareAppState();
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Sticker Share',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        useMaterial3: true,
+      ),
+      home: const SplashWrapper(),
+    );
+  }
 }
 
-class _StickerShareAppState extends State<StickerShareApp> {
+class SplashWrapper extends StatefulWidget {
+  const SplashWrapper({super.key});
+
+  @override
+  State<SplashWrapper> createState() => _SplashWrapperState();
+}
+
+class _SplashWrapperState extends State<SplashWrapper> {
   bool _showSplash = true;
+  StickerProvider? _provider;
+
+  @override
+  void initState() {
+    super.initState();
+    // Create provider lazily, only when needed
+    _provider = StickerProvider();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => StickerProvider(),
-      child: MaterialApp(
-        title: 'Sticker Share',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-          useMaterial3: true,
+    if (_showSplash) {
+      return ChangeNotifierProvider.value(
+        value: _provider!,
+        child: SplashScreen(
+          onComplete: () {
+            if (mounted) {
+              setState(() {
+                _showSplash = false;
+              });
+            }
+          },
         ),
-        home: _showSplash
-            ? SplashScreen(
-                onComplete: () {
-                  setState(() {
-                    _showSplash = false;
-                  });
-                },
-              )
-            : const HomeScreen(),
-      ),
+      );
+    }
+
+    return ChangeNotifierProvider.value(
+      value: _provider!,
+      child: const HomeScreen(),
     );
+  }
+
+  @override
+  void dispose() {
+    _provider?.dispose();
+    super.dispose();
   }
 }

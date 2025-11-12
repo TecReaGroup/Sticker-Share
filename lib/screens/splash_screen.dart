@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 import 'package:provider/provider.dart';
 import '../providers/sticker_provider.dart';
+import '../models/sticker_model.dart';
 
 class SplashScreen extends StatefulWidget {
   final VoidCallback onComplete;
@@ -51,6 +52,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       // Scan and load assets (themes and stickers)
       await provider.scanAndLoadAssets();
       
+      // Preload Lottie compositions for faster initial rendering
+      await _preloadLottieCompositions(provider.stickers);
+      
       // Wait minimum 2 seconds for better UX
       await Future.delayed(const Duration(seconds: 2));
       
@@ -63,6 +67,43 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       if (mounted) {
         widget.onComplete();
       }
+    }
+  }
+  
+  /// Preload Lottie compositions to cache them for instant display
+  Future<void> _preloadLottieCompositions(List<StickerModel> stickers) async {
+    if (stickers.isEmpty) return;
+    
+    try {
+      debugPrint('Preloading ${stickers.length} Lottie compositions...');
+      
+      // Preload compositions in batches to avoid overwhelming the system
+      const batchSize = 10;
+      int loadedCount = 0;
+      
+      for (int i = 0; i < stickers.length; i += batchSize) {
+        final batch = stickers.skip(i).take(batchSize).toList();
+        
+        // Load batch concurrently
+        await Future.wait(
+          batch.map((sticker) async {
+            try {
+              // Load and cache the composition
+              await AssetLottie(sticker.localPath).load();
+              loadedCount++;
+            } catch (e) {
+              debugPrint('Failed to preload ${sticker.localPath}: $e');
+            }
+          }),
+        );
+        
+        debugPrint('Preloaded $loadedCount/${stickers.length} compositions');
+      }
+      
+      debugPrint('Lottie preloading complete!');
+    } catch (e) {
+      debugPrint('Error preloading Lottie compositions: $e');
+      // Don't throw - we can still proceed without preloading
     }
   }
   
