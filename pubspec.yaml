@@ -63,6 +63,7 @@ dependencies:
   photo_view: ^0.14.0
   gif_view: ^0.4.3
   lottie: ^3.1.0
+  flutter_svg: ^2.0.9
 
 dev_dependencies:
   flutter_test:
@@ -89,6 +90,7 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
+    - assets/icon/icon.svg
     - assets/animations/
     - assets/stickers/DonutTheDog/gif/
     - assets/stickers/DonutTheDog/lottie/
@@ -120,6 +122,7 @@ flutter:
   # https://flutter.dev/to/asset-from-package
 
 # Flutter Launcher Icons configuration
+# use command: flutter pub run flutter_launcher_icons
 flutter_launcher_icons:
   android: true
   ios: true

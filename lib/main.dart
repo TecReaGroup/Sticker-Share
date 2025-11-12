@@ -10,18 +10,42 @@ void main() {
   runApp(const StickerShareApp());
 }
 
-class StickerShareApp extends StatelessWidget {
+class StickerShareApp extends StatefulWidget {
   const StickerShareApp({super.key});
 
   @override
+  State<StickerShareApp> createState() => _StickerShareAppState();
+}
+
+class _StickerShareAppState extends State<StickerShareApp> {
+  // Provider created early to avoid white screen
+  late final StickerProvider _stickerProvider;
+
+  @override
+  void initState() {
+    super.initState();
+    // Create provider immediately in initState
+    _stickerProvider = StickerProvider();
+  }
+
+  @override
+  void dispose() {
+    _stickerProvider.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Sticker Share',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
+    return ChangeNotifierProvider.value(
+      value: _stickerProvider,
+      child: MaterialApp(
+        title: 'Sticker Share',
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+          useMaterial3: true,
+        ),
+        home: const SplashWrapper(),
       ),
-      home: const SplashWrapper(),
     );
   }
 }
@@ -35,41 +59,21 @@ class SplashWrapper extends StatefulWidget {
 
 class _SplashWrapperState extends State<SplashWrapper> {
   bool _showSplash = true;
-  StickerProvider? _provider;
-
-  @override
-  void initState() {
-    super.initState();
-    // Create provider lazily, only when needed
-    _provider = StickerProvider();
-  }
 
   @override
   Widget build(BuildContext context) {
     if (_showSplash) {
-      return ChangeNotifierProvider.value(
-        value: _provider!,
-        child: SplashScreen(
-          onComplete: () {
-            if (mounted) {
-              setState(() {
-                _showSplash = false;
-              });
-            }
-          },
-        ),
+      return SplashScreen(
+        onComplete: () {
+          if (mounted) {
+            setState(() {
+              _showSplash = false;
+            });
+          }
+        },
       );
     }
 
-    return ChangeNotifierProvider.value(
-      value: _provider!,
-      child: const HomeScreen(),
-    );
-  }
-
-  @override
-  void dispose() {
-    _provider?.dispose();
-    super.dispose();
+    return const HomeScreen();
   }
 }

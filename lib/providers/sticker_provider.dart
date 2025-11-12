@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:lottie/lottie.dart';
 import '../models/sticker_model.dart';
 import '../models/theme_model.dart';
 import '../services/database_service.dart';
@@ -14,6 +15,11 @@ class StickerProvider with ChangeNotifier {
   bool _showFavoritesOnly = false;
   bool _isLoading = false;
   String? _error;
+  
+  // Background loading state
+  bool _isBackgroundLoading = false;
+  final Set<String> _loadedLotties = {}; // Cache of loaded Lottie paths
+  bool _backgroundLoadingCancelled = false;
 
   List<StickerModel> get stickers => _stickers;
   List<ThemeModel> get themes => _themes;
@@ -177,6 +183,8 @@ class StickerProvider with ChangeNotifier {
     if (themeId != null && themeId != _selectedThemeId) {
       _selectedThemeId = themeId;
       notifyListeners();
+      // Prioritize loading current theme stickers
+      _prioritizeThemeLoading(themeId);
     }
   }
 
@@ -190,6 +198,94 @@ class StickerProvider with ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  // Start background loading of Lottie animations one by one
+  void startBackgroundLoading() {
+    if (_isBackgroundLoading || _stickers.isEmpty) return;
+    
+    _isBackgroundLoading = true;
+    _backgroundLoadingCancelled = false;
+    
+    debugPrint('🎨 Starting background Lottie loading...');
+    
+    // Load current theme first, then others
+    _loadLottiesInBackground();
+  }
+
+  // Prioritize loading for specific theme
+  void _prioritizeThemeLoading(String themeId) {
+    debugPrint('🎯 Prioritizing theme: $themeId');
+    
+    // Cancel current background loading
+    _backgroundLoadingCancelled = true;
+    
+    // Restart with new priority
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (_selectedThemeId == themeId) {
+        _isBackgroundLoading = false;
+        startBackgroundLoading();
+      }
+    });
+  }
+
+  // Load Lottie animations one by one in background
+  Future<void> _loadLottiesInBackground() async {
+    // Get stickers sorted by priority: current theme first, then others
+    final currentThemeStickers = _stickers
+        .where((s) => s.themeId == _selectedThemeId)
+        .where((s) => !_loadedLotties.contains(s.localPath))
+        .toList();
+    
+    final otherStickers = _stickers
+        .where((s) => s.themeId != _selectedThemeId)
+        .where((s) => !_loadedLotties.contains(s.localPath))
+        .toList();
+    
+    final orderedStickers = [...currentThemeStickers, ...otherStickers];
+    
+    debugPrint('📊 Loading queue: ${orderedStickers.length} Lotties '
+        '(${currentThemeStickers.length} from current theme)');
+    
+    // Load one by one with delay to avoid overwhelming the system
+    for (int i = 0; i < orderedStickers.length; i++) {
+      if (_backgroundLoadingCancelled) {
+        debugPrint('🛑 Background loading cancelled');
+        break;
+      }
+      
+      final sticker = orderedStickers[i];
+      
+      try {
+        // Load the Lottie composition (this caches it)
+        await AssetLottie(sticker.localPath).load();
+        _loadedLotties.add(sticker.localPath);
+        
+        if ((i + 1) % 5 == 0) {
+          debugPrint('✅ Loaded ${i + 1}/${orderedStickers.length} Lotties');
+        }
+        
+        // Small delay between loads to keep UI responsive
+        await Future.delayed(const Duration(milliseconds: 50));
+      } catch (e) {
+        debugPrint('❌ Failed to load ${sticker.localPath}: $e');
+      }
+    }
+    
+    if (!_backgroundLoadingCancelled) {
+      debugPrint('🎉 Background loading complete! Total cached: ${_loadedLotties.length}');
+    }
+    
+    _isBackgroundLoading = false;
+  }
+
+  // Check if a Lottie is already loaded
+  bool isLottieLoaded(String path) => _loadedLotties.contains(path);
+
+  @override
+  void dispose() {
+    _backgroundLoadingCancelled = true;
+    super.dispose();
   }
 
   // Scan assets directory and load themes/stickers
