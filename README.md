@@ -1,25 +1,36 @@
 # Sticker Share
 
-[![Flutter](https://img.shields.io/badge/Flutter-3.9.2-02569B?logo=flutter)](https://flutter.dev)
-[![Dart](https://img.shields.io/badge/Dart-3.9.2-0175C2?logo=dart)](https://dart.dev)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Flutter](https://img.shields.io/badge/Flutter-02569B?style=for-the-badge&logo=flutter&logoColor=white)](https://flutter.dev)
+[![Dart](https://img.shields.io/badge/Dart-0175C2?style=for-the-badge&logo=dart&logoColor=white)](https://dart.dev)
 
-A high-performance Flutter application for managing and sharing animated stickers across messaging platforms. Features smooth Lottie animations, intelligent background loading, and optimized gesture handling.
+`English` | [中文](README_CN.md)
 
-[中文文档](README_CN.md)
+Sticker Share: Manage and share animated stickers to various messaging platforms.
 
-## ✨ Features
+<p align="center">
+  <img src="./assets/images/splashScreen.jpg" width="30%" />
+  <img src="./assets/images/homeScreen.jpg" width="30%" />
+  <img src="./assets/images/wechat.jpg" width="30%" />
+</p>
 
-- 🎨 **Animated Stickers**: Beautiful Lottie animations with smooth rendering
-- 📦 **Sticker Pack Management**: Organize stickers into categorized packs
-- ⭐ **Favorites System**: Mark favorite sticker packs for quick access
-- 🚀 **Performance Optimized**: Smart background loading and animation pausing
-- 📱 **Multi-Platform Sharing**: Share to WeChat, WhatsApp, Telegram, and more
-- 🎯 **Gesture Navigation**: Swipe to switch between sticker packs
-- 💾 **Local Database**: SQLite-based persistent storage
-- 🎭 **Smooth UX**: Optimized scroll performance and animation handling
+## Notes
 
-## 🏗️ Architecture
+[Telegram Stickers Download](https://github.com/TecReaGroup/telgram_stickers_download)
+
+Currently only tested on Android, the specific situation for Android is as follows:
+
+| App | Status | Notes |
+|-----|------|------|
+| WeChat | Tested | Send to preview cannot load |
+| QQ | Tested | Fully supported |
+| Discord | Tested | Fully supported |
+| X | Tested | Fully supported |
+| Messenger | Tested | Fully supported |
+| Telegram | Tested | Automatically converts to image |
+| WhatsApp | Untested | To be tested |
+| LINE | Untested | To be tested |
+
+## Architecture
 
 ### Project Structure
 
@@ -47,7 +58,7 @@ lib/
 - **Image Processing**: GIF conversion for sharing
 - **Platform Integration**: Method channels for native messaging apps
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
@@ -90,7 +101,7 @@ flutter build ios --release
 flutter build windows --release
 ```
 
-## 📱 Usage
+## Usage
 
 ### Managing Sticker Packs
 
@@ -105,7 +116,7 @@ flutter build windows --release
 2. **Select App**: Choose from installed messaging apps
 3. **Share**: Sticker is converted to GIF and shared
 
-## ⚡ Performance Optimizations
+## Performance Optimization
 
 For detailed information about the UI/UX optimizations implemented in this project, see the [Performance Documentation](doc/PERFORMANCE.md).
 
@@ -115,8 +126,9 @@ Key highlights:
 - Prioritized pack loading
 - Gesture-based navigation
 - Memory-efficient rendering
+- Clicking on a sticker shows only half of the bottom listTile to hint at scrolling
 
-## 🛠️ Development
+## Development
 
 ### Adding New Sticker Packs
 
@@ -139,20 +151,19 @@ Key highlights:
 - gifPath (TEXT): GIF asset path
 - packId (TEXT): Foreign key to sticker_packs
 
-## 📝 License
+## TODO List
+ - [ ] Local import of Stickers
+ - [ ] Cloud backup and download
+ - [ ] Multi-language support
+ - [ ] Add sticker preview feature (long press to view)
+ - [ ] Optimize operation logic and UI/UX for better Sticker management
+ - [ ] iOS support
+ - [ ] Support sticker editing
+
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📧 Contact
-
-Project Link: [https://github.com/yourusername/sticker_share](https://github.com/yourusername/sticker_share)
