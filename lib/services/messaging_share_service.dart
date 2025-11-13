@@ -4,12 +4,13 @@ import 'package:flutter/services.dart';
 enum MessagingApp {
   wechat('com.tencent.mm', 'WeChat'),
   qq('com.tencent.mobileqq', 'QQ'),
-  whatsapp('com.whatsapp', 'WhatsApp'),
-  telegram('org.telegram.messenger', 'Telegram'),
-  discord('com.discord', 'Discord'),
+  x('com.twitter.android', 'X'),
   messenger('com.facebook.orca', 'Messenger'),
   line('jp.naver.line.android', 'LINE'),
-  x('com.twitter.android', 'X');
+  whatsapp('com.whatsapp', 'WhatsApp'),
+  discord('com.discord', 'Discord'),
+  telegram('org.telegram.messenger', 'Telegram'),
+  ;
 
   final String packageName;
   final String displayName;

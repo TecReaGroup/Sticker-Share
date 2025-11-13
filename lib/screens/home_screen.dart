@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lottie/lottie.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../providers/sticker_provider.dart';
 import '../models/sticker_model.dart';
 import '../services/messaging_share_service.dart';
@@ -566,17 +567,31 @@ class _StickerCardState extends State<_StickerCard>
         
         debugPrint('>>> Total widgets created: ${widgets.length}');
         
+        // Calculate initial size to show N complete items + 0.5 of last item
+        final screenHeight = MediaQuery.of(context).size.height;
+        const double listTileHeight = 72.0;
+        const double topPadding = 16.0;
+        const double targetVisibleItems = 5.5; // 3 complete + 0.5 partial
+        final targetHeight = topPadding + (listTileHeight * targetVisibleItems);
+        final calculatedSize = (targetHeight / screenHeight).clamp(0.3, 0.6);
+        
         return DraggableScrollableSheet(
-          initialChildSize: 0.6,
+          initialChildSize: calculatedSize,
           minChildSize: 0.3,
           maxChildSize: 0.9,
           expand: false,
           builder: (context, scrollController) {
             return Container(
-              padding: const EdgeInsets.all(16),
-              child: ListView(
-                controller: scrollController,
-                children: widgets,
+              padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 0),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ListView(
+                      controller: scrollController,
+                      children: widgets,
+                    ),
+                  ),
+                ],
               ),
             );
           },
@@ -588,21 +603,21 @@ class _StickerCardState extends State<_StickerCard>
   IconData _getAppIcon(MessagingApp app) {
     switch (app) {
       case MessagingApp.wechat:
-        return Icons.chat_bubble;
+        return FontAwesomeIcons.weixin;
       case MessagingApp.qq:
-        return Icons.forum;
+        return FontAwesomeIcons.qq;
       case MessagingApp.whatsapp:
-        return Icons.chat;
+        return FontAwesomeIcons.whatsapp;
       case MessagingApp.telegram:
-        return Icons.send;
+        return FontAwesomeIcons.telegram;
       case MessagingApp.discord:
-        return Icons.discord;
+        return FontAwesomeIcons.discord;
       case MessagingApp.messenger:
-        return Icons.messenger;
+        return FontAwesomeIcons.facebookMessenger;
       case MessagingApp.line:
-        return Icons.chat_bubble_outline;
+        return FontAwesomeIcons.line;
       case MessagingApp.x:
-        return Icons.tag;
+        return FontAwesomeIcons.xTwitter;
     }
   }
 
