@@ -16,17 +16,18 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _scrollController = ScrollController();
-  late PageController _pageController;
   bool _isScrolling = false;
   bool _isFingerDown = false; // Track if finger is touching the screen
   Timer? _resumeAnimationTimer; // Timer for delayed animation resume
-  int _currentPageIndex = 0;
+  
+  // Theme swipe state
+  double _horizontalDragOffset = 0.0;
+  static const double _swipeThreshold = 10.0; // Minimum drag distance to trigger switch
 
   @override
   void initState() {
     super.initState();
     // Data is already preloaded in splash screen, no need to load again
-    _pageController = PageController();
   }
 
   bool _handleScrollNotification(ScrollNotification notification) {
@@ -44,7 +45,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _resumeAnimationTimer?.cancel();
     _scrollController.dispose();
-    _pageController.dispose();
     super.dispose();
   }
 
@@ -107,6 +107,9 @@ class _HomeScreenState extends State<HomeScreen> {
           }
 
           final stickers = provider.filteredStickers;
+          final themes = provider.showFavoritesOnly
+              ? provider.favoriteThemes
+              : provider.themes;
 
           if (stickers.isEmpty) {
             return Center(
@@ -130,98 +133,119 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           }
 
-          // Get the list of themes to display
-          final displayThemes = provider.showFavoritesOnly
-              ? provider.favoriteThemes
-              : provider.themes;
-
-          // Find current theme index
-          final currentThemeIndex = displayThemes.indexWhere(
-            (theme) => theme.id == provider.selectedThemeId,
-          );
-
-          // Update page controller if theme changed externally (e.g., from theme selector)
-          if (currentThemeIndex != -1 && _currentPageIndex != currentThemeIndex) {
-            _currentPageIndex = currentThemeIndex;
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (_pageController.hasClients) {
-                _pageController.jumpToPage(currentThemeIndex);
-              }
-            });
-          }
-
-          return Listener(
-            onPointerDown: (_) {
-              // Finger touches screen - pause animations immediately
-              _resumeAnimationTimer?.cancel();
-              if (!_isFingerDown) {
-                setState(() {
-                  _isFingerDown = true;
-                  _isScrolling = true;
-                });
-              }
-            },
-            onPointerUp: (_) {
-              // Finger leaves screen - mark finger as up but keep animations paused
+          return GestureDetector(
+            onHorizontalDragStart: (details) {
               setState(() {
-                _isFingerDown = false;
+                _horizontalDragOffset = 0.0;
               });
-
-              // Schedule animation resume after delay (150ms)
-              // This prevents flicker on quick swipes while still being responsive
-              _resumeAnimationTimer?.cancel();
-              _resumeAnimationTimer = Timer(
-                const Duration(milliseconds: 100),
-                () {
-                  if (mounted && !_isFingerDown) {
-                    setState(() => _isScrolling = false);
-                  }
-                },
-              );
             },
-            child: PageView.builder(
-              controller: _pageController,
-              itemCount: displayThemes.length,
-              onPageChanged: (index) {
-                // Update current page index
-                _currentPageIndex = index;
-                // Switch to the corresponding theme
-                if (index >= 0 && index < displayThemes.length) {
-                  provider.selectTheme(displayThemes[index].id);
+            onHorizontalDragUpdate: (details) {
+              setState(() {
+                // Add resistance effect (slower movement when dragging)
+                _horizontalDragOffset += details.delta.dx * 0.5;
+                
+                // Limit drag distance
+                final currentIndex = themes.indexWhere((t) => t.id == provider.selectedThemeId);
+                
+                // Prevent dragging right if at first theme
+                if (currentIndex == 0 && _horizontalDragOffset > 0) {
+                  _horizontalDragOffset = _horizontalDragOffset.clamp(0.0, 50.0);
                 }
-              },
-              itemBuilder: (context, pageIndex) {
-                final theme = displayThemes[pageIndex];
-                final themeStickers = provider.stickers
-                    .where((s) => s.themeId == theme.id)
-                    .toList();
+                
+                // Prevent dragging left if at last theme
+                if (currentIndex == themes.length - 1 && _horizontalDragOffset < 0) {
+                  _horizontalDragOffset = _horizontalDragOffset.clamp(-50.0, 0.0);
+                }
+                
+                // Normal clamp for middle themes
+                if (currentIndex > 0 && currentIndex < themes.length - 1) {
+                  _horizontalDragOffset = _horizontalDragOffset.clamp(-150.0, 150.0);
+                }
+              });
+            },
+            onHorizontalDragEnd: (details) {
+              final currentIndex = themes.indexWhere((t) => t.id == provider.selectedThemeId);
+              
+              // Determine if should switch theme
+              if (_horizontalDragOffset.abs() >= _swipeThreshold) {
+                if (_horizontalDragOffset > 0 && currentIndex > 0) {
+                  // Swipe right - go to previous theme
+                  provider.selectTheme(themes[currentIndex - 1].id);
+                } else if (_horizontalDragOffset < 0 && currentIndex < themes.length - 1) {
+                  // Swipe left - go to next theme
+                  provider.selectTheme(themes[currentIndex + 1].id);
+                }
+              }
+              
+              // Reset state
+              setState(() {
+                _horizontalDragOffset = 0.0;
+              });
+            },
+            child: Stack(
+              children: [
+                // Main content with transform
+                Transform.translate(
+                  offset: Offset(_horizontalDragOffset, 0),
+                  child: Listener(
+                    onPointerDown: (_) {
+                      // Finger touches screen - pause animations immediately
+                      _resumeAnimationTimer?.cancel();
+                      if (!_isFingerDown) {
+                        setState(() {
+                          _isFingerDown = true;
+                          _isScrolling = true;
+                        });
+                      }
+                    },
+                    onPointerUp: (_) {
+                      // Finger leaves screen - mark finger as up but keep animations paused
+                      setState(() {
+                        _isFingerDown = false;
+                      });
 
-                return NotificationListener<ScrollNotification>(
-                  onNotification: _handleScrollNotification,
-                  child: GridView.builder(
-                    controller: _scrollController,
-                    key: ValueKey('grid_${theme.id}'),
-                    padding: const EdgeInsets.all(8),
-                    physics: const BouncingScrollPhysics(
-                      parent: AlwaysScrollableScrollPhysics(),
-                    ),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                      childAspectRatio: 1,
-                    ),
-                    itemCount: themeStickers.length,
-                    itemBuilder: (context, index) {
-                      final sticker = themeStickers[index];
-                      return _StickerCard(
-                        sticker: sticker,
-                        isScrolling: _isScrolling,
+                      // Schedule animation resume after delay (150ms)
+                      // This prevents flicker on quick swipes while still being responsive
+                      _resumeAnimationTimer?.cancel();
+                      _resumeAnimationTimer = Timer(
+                        const Duration(milliseconds: 100),
+                        () {
+                          if (mounted && !_isFingerDown) {
+                            setState(() => _isScrolling = false);
+                          }
+                        },
                       );
                     },
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: _handleScrollNotification,
+                      child: GridView.builder(
+                        controller: _scrollController,
+                        key: ValueKey(
+                          'grid_${provider.selectedThemeId}_${provider.showFavoritesOnly}',
+                        ),
+                        padding: const EdgeInsets.all(8),
+                        physics: const BouncingScrollPhysics(
+                          parent: AlwaysScrollableScrollPhysics(),
+                        ),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          crossAxisSpacing: 8,
+                          mainAxisSpacing: 8,
+                          childAspectRatio: 1,
+                        ),
+                        itemCount: stickers.length,
+                        itemBuilder: (context, index) {
+                          final sticker = stickers[index];
+                          return _StickerCard(
+                            sticker: sticker,
+                            isScrolling: _isScrolling,
+                          );
+                        },
+                      ),
+                    ),
                   ),
-                );
-              },
+                ),
+              ],
             ),
           );
         },
@@ -230,7 +254,49 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _ThemeSelector extends StatelessWidget {
+class _ThemeSelector extends StatefulWidget {
+  @override
+  State<_ThemeSelector> createState() => _ThemeSelectorState();
+}
+
+class _ThemeSelectorState extends State<_ThemeSelector> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToSelectedTheme(String? selectedThemeId, List themes) {
+    if (selectedThemeId == null || themes.isEmpty) return;
+
+    final selectedIndex = themes.indexWhere((t) => t.id == selectedThemeId);
+    if (selectedIndex == -1) return;
+
+    // Use post frame callback to ensure layout is complete
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+
+      // Calculate approximate item width (padding + text)
+      const itemWidth = 120.0; // Approximate width
+      final viewportWidth = _scrollController.position.viewportDimension;
+      
+      // Calculate target scroll position to center the item
+      final targetOffset = (selectedIndex * itemWidth) - (viewportWidth / 2) + (itemWidth / 2);
+      
+      // Clamp to valid scroll range
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      final clampedOffset = targetOffset.clamp(0.0, maxScroll);
+
+      _scrollController.animateTo(
+        clampedOffset,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<StickerProvider>(
@@ -243,10 +309,14 @@ class _ThemeSelector extends StatelessWidget {
           return const SizedBox(height: 60);
         }
 
+        // Scroll to selected theme when it changes
+        _scrollToSelectedTheme(provider.selectedThemeId, themes);
+
         return Container(
           height: 60,
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: ListView.builder(
+            controller: _scrollController,
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 8),
             itemCount: themes.length,
