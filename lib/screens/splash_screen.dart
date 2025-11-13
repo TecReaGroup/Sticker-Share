@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../providers/sticker_provider.dart';
@@ -76,12 +77,22 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _fadeAnimation,
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        body: SafeArea(
-          child: Center(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarContrastEnforced: false,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: Scaffold(
+          backgroundColor: Colors.white,
+          extendBody: true,
+          body: SafeArea(
+            bottom: false, // Allow content to extend to bottom navigation bar
+            child: Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.start,
               children: [
@@ -145,6 +156,7 @@ class _SplashScreenState extends State<SplashScreen>
               ],
             ),
           ),
+        ),
         ),
       ),
     );

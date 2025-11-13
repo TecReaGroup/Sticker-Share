@@ -51,8 +51,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarContrastEnforced: false,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        extendBody: true, // Allow content to extend behind navigation bar
+        appBar: AppBar(
         title: const Text('Sticker Management'),
         backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
@@ -251,6 +261,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
         },
+      ),
       ),
     );
   }
