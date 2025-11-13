@@ -87,15 +87,18 @@ class _SplashScreenState extends State<SplashScreen>
               children: [
                 // SVG Icon with fade-in effect
                 Expanded(
-                  flex: 3,
-                  child: Center(
-                    child: SvgPicture.asset(
-                      'assets/icon/icon.svg',
-                      width: MediaQuery.of(context).size.width * 0.5,
-                      height: MediaQuery.of(context).size.width * 0.5,
-                      fit: BoxFit.contain,
-                      placeholderBuilder: (context) =>
-                          const CircularProgressIndicator(),
+                  flex: 2,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 60.0),
+                    child: Center(
+                      child: SvgPicture.asset(
+                        'assets/icon/icon.svg',
+                        width: MediaQuery.of(context).size.width * 0.5,
+                        height: MediaQuery.of(context).size.width * 0.5,
+                        fit: BoxFit.contain,
+                        placeholderBuilder: (context) =>
+                            const CircularProgressIndicator(),
+                      ),
                     ),
                   ),
                 ),
@@ -124,6 +127,15 @@ class _SplashScreenState extends State<SplashScreen>
                             Colors.blue[400]!,
                           ),
                           minHeight: 3,
+                        ),
+                      ),
+                      const SizedBox(height: 36),
+                      Text(
+                        'Tips: Long press the stickerPack to like',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                          fontStyle: FontStyle.italic,
                         ),
                       ),
                       const SizedBox(height: 40),

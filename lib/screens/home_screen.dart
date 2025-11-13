@@ -114,22 +114,25 @@ class _HomeScreenState extends State<HomeScreen> {
 
           if (stickers.isEmpty) {
             return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.sentiment_dissatisfied,
-                    size: 64,
-                    color: Colors.grey,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    provider.showFavoritesOnly
-                        ? 'No favorite sticker packs'
-                        : 'No stickers',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 100),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.sentiment_dissatisfied,
+                      size: 64,
+                      color: Colors.grey,
+                    ),
+                    const SizedBox(height: 24),
+                    Text(
+                      provider.showFavoritesOnly
+                          ? 'Long press a stickerPack to add favorites'
+                          : 'No stickers',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ],
+                ),
               ),
             );
           }
