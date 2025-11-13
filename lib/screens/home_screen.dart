@@ -58,7 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
         foregroundColor: Colors.white,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
-          child: _ThemeSelector(),
+          child: _PackSelector(),
         ),
         actions: [
           Consumer<StickerProvider>(
@@ -108,9 +108,9 @@ class _HomeScreenState extends State<HomeScreen> {
           }
 
           final stickers = provider.filteredStickers;
-          final themes = provider.showFavoritesOnly
-              ? provider.favoriteThemes
-              : provider.themes;
+          final packs = provider.showFavoritesOnly
+              ? provider.favoriteStickerPacks
+              : provider.stickerPacks;
 
           if (stickers.isEmpty) {
             return Center(
@@ -125,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 16),
                   Text(
                     provider.showFavoritesOnly
-                        ? 'No favorite themes'
+                        ? 'No favorite sticker packs'
                         : 'No stickers',
                     style: const TextStyle(fontSize: 16),
                   ),
@@ -142,16 +142,16 @@ class _HomeScreenState extends State<HomeScreen> {
             },
             onHorizontalDragUpdate: (details) {
               setState(() {
-                final currentIndex = themes.indexWhere((t) => t.id == provider.selectedThemeId);
+                final currentIndex = packs.indexWhere((p) => p.id == provider.selectedPackId);
                 
                 // Completely prevent dragging at boundaries
                 if (currentIndex == 0 && details.delta.dx > 0) {
-                  // At first theme, don't allow right drag
+                  // At first pack, don't allow right drag
                   return;
                 }
                 
-                if (currentIndex == themes.length - 1 && details.delta.dx < 0) {
-                  // At last theme, don't allow left drag
+                if (currentIndex == packs.length - 1 && details.delta.dx < 0) {
+                  // At last pack, don't allow left drag
                   return;
                 }
                 
@@ -163,16 +163,16 @@ class _HomeScreenState extends State<HomeScreen> {
               });
             },
             onHorizontalDragEnd: (details) {
-              final currentIndex = themes.indexWhere((t) => t.id == provider.selectedThemeId);
+              final currentIndex = packs.indexWhere((p) => p.id == provider.selectedPackId);
               
-              // Determine if should switch theme
+              // Determine if should switch pack
               if (_horizontalDragOffset.abs() >= _swipeThreshold) {
                 if (_horizontalDragOffset > 0 && currentIndex > 0) {
-                  // Swipe right - go to previous theme
-                  provider.selectTheme(themes[currentIndex - 1].id);
-                } else if (_horizontalDragOffset < 0 && currentIndex < themes.length - 1) {
-                  // Swipe left - go to next theme
-                  provider.selectTheme(themes[currentIndex + 1].id);
+                  // Swipe right - go to previous pack
+                  provider.selectStickerPack(packs[currentIndex - 1].id);
+                } else if (_horizontalDragOffset < 0 && currentIndex < packs.length - 1) {
+                  // Swipe left - go to next pack
+                  provider.selectStickerPack(packs[currentIndex + 1].id);
                 }
               }
               
@@ -220,7 +220,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: GridView.builder(
                         controller: _scrollController,
                         key: ValueKey(
-                          'grid_${provider.selectedThemeId}_${provider.showFavoritesOnly}',
+                          'grid_${provider.selectedPackId}_${provider.showFavoritesOnly}',
                         ),
                         padding: const EdgeInsets.all(8),
                         physics: const ClampingScrollPhysics(
@@ -253,12 +253,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _ThemeSelector extends StatefulWidget {
+class _PackSelector extends StatefulWidget {
   @override
-  State<_ThemeSelector> createState() => _ThemeSelectorState();
+  State<_PackSelector> createState() => _PackSelectorState();
 }
 
-class _ThemeSelectorState extends State<_ThemeSelector> {
+class _PackSelectorState extends State<_PackSelector> {
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -267,10 +267,10 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
     super.dispose();
   }
 
-  void _scrollToSelectedTheme(String? selectedThemeId, List themes) {
-    if (selectedThemeId == null || themes.isEmpty) return;
+  void _scrollToSelectedPack(String? selectedPackId, List packs) {
+    if (selectedPackId == null || packs.isEmpty) return;
 
-    final selectedIndex = themes.indexWhere((t) => t.id == selectedThemeId);
+    final selectedIndex = packs.indexWhere((p) => p.id == selectedPackId);
     if (selectedIndex == -1) return;
 
     // Use post frame callback to ensure layout is complete
@@ -300,16 +300,16 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
   Widget build(BuildContext context) {
     return Consumer<StickerProvider>(
       builder: (context, provider, child) {
-        final themes = provider.showFavoritesOnly
-            ? provider.favoriteThemes
-            : provider.themes;
+        final packs = provider.showFavoritesOnly
+            ? provider.favoriteStickerPacks
+            : provider.stickerPacks;
 
-        if (themes.isEmpty) {
+        if (packs.isEmpty) {
           return const SizedBox(height: 60);
         }
 
-        // Scroll to selected theme when it changes
-        _scrollToSelectedTheme(provider.selectedThemeId, themes);
+        // Scroll to selected pack when it changes
+        _scrollToSelectedPack(provider.selectedPackId, packs);
 
         return Container(
           height: 60,
@@ -318,18 +318,18 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
             controller: _scrollController,
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 8),
-            itemCount: themes.length,
+            itemCount: packs.length,
             itemBuilder: (context, index) {
-              final theme = themes[index];
-              final isSelected = provider.selectedThemeId == theme.id;
+              final pack = packs[index];
+              final isSelected = provider.selectedPackId == pack.id;
 
               return GestureDetector(
                 onTap: () {
-                  // Only allow switching to a different theme
-                  provider.selectTheme(theme.id);
+                  // Only allow switching to a different pack
+                  provider.selectStickerPack(pack.id);
                 },
                 onLongPress: () {
-                  provider.toggleThemeFavorite(theme.id);
+                  provider.toggleStickerPackFavorite(pack.id);
                 },
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -350,7 +350,7 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (theme.isFavorite)
+                      if (pack.isFavorite)
                         const Padding(
                           padding: EdgeInsets.only(right: 4),
                           child: Icon(
@@ -360,7 +360,7 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
                           ),
                         ),
                       Text(
-                        theme.name,
+                        pack.name,
                         style: TextStyle(
                           color: isSelected ? Colors.blue : Colors.white,
                           fontWeight: isSelected

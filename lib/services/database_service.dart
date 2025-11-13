@@ -1,7 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import '../models/sticker_model.dart';
-import '../models/theme_model.dart';
+import '../models/sticker_pack_model.dart';
 
 class DatabaseService {
   static Database? _database;
@@ -16,7 +16,7 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'sticker_share.db');
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE stickers(
@@ -24,11 +24,11 @@ class DatabaseService {
             name TEXT,
             localPath TEXT,
             gifPath TEXT,
-            themeId TEXT
+            packId TEXT
           )
         ''');
         await db.execute('''
-          CREATE TABLE themes(
+          CREATE TABLE sticker_packs(
             id TEXT PRIMARY KEY,
             name TEXT,
             isFavorite INTEGER
@@ -38,6 +38,7 @@ class DatabaseService {
       onUpgrade: (db, oldVersion, newVersion) async {
         // Always drop and recreate for clean slate
         await db.execute('DROP TABLE IF EXISTS stickers');
+        await db.execute('DROP TABLE IF EXISTS sticker_packs');
         await db.execute('DROP TABLE IF EXISTS themes');
         await db.execute('DROP TABLE IF EXISTS emojis');
         await db.execute('DROP TABLE IF EXISTS categories');
@@ -48,11 +49,11 @@ class DatabaseService {
             name TEXT,
             localPath TEXT,
             gifPath TEXT,
-            themeId TEXT
+            packId TEXT
           )
         ''');
         await db.execute('''
-          CREATE TABLE themes(
+          CREATE TABLE sticker_packs(
             id TEXT PRIMARY KEY,
             name TEXT,
             isFavorite INTEGER
@@ -63,12 +64,12 @@ class DatabaseService {
   }
 
   // Sticker operations
-  Future<List<StickerModel>> getStickers({String? themeId}) async {
+  Future<List<StickerModel>> getStickers({String? packId}) async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
       'stickers',
-      where: themeId != null ? 'themeId = ?' : null,
-      whereArgs: themeId != null ? [themeId] : null,
+      where: packId != null ? 'packId = ?' : null,
+      whereArgs: packId != null ? [packId] : null,
     );
     return maps.map((map) => StickerModel.fromMap(map)).toList();
   }
@@ -91,65 +92,65 @@ class DatabaseService {
     );
   }
 
-  Future<void> deleteStickersByTheme(String themeId) async {
+  Future<void> deleteStickersByPack(String packId) async {
     final db = await database;
     await db.delete(
       'stickers',
-      where: 'themeId = ?',
-      whereArgs: [themeId],
+      where: 'packId = ?',
+      whereArgs: [packId],
     );
   }
 
-  // Theme operations
-  Future<List<ThemeModel>> getThemes() async {
+  // Sticker Pack operations
+  Future<List<StickerPackModel>> getStickerPacks() async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('themes');
-    return maps.map((map) => ThemeModel.fromMap(map)).toList();
+    final List<Map<String, dynamic>> maps = await db.query('sticker_packs');
+    return maps.map((map) => StickerPackModel.fromMap(map)).toList();
   }
 
-  Future<List<ThemeModel>> getFavoriteThemes() async {
+  Future<List<StickerPackModel>> getFavoriteStickerPacks() async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query(
-      'themes',
+      'sticker_packs',
       where: 'isFavorite = ?',
       whereArgs: [1],
     );
-    return maps.map((map) => ThemeModel.fromMap(map)).toList();
+    return maps.map((map) => StickerPackModel.fromMap(map)).toList();
   }
 
-  Future<void> insertTheme(ThemeModel theme) async {
+  Future<void> insertStickerPack(StickerPackModel pack) async {
     final db = await database;
     await db.insert(
-      'themes',
-      theme.toMap(),
+      'sticker_packs',
+      pack.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
-  Future<void> updateTheme(ThemeModel theme) async {
+  Future<void> updateStickerPack(StickerPackModel pack) async {
     final db = await database;
     await db.update(
-      'themes',
-      theme.toMap(),
+      'sticker_packs',
+      pack.toMap(),
       where: 'id = ?',
-      whereArgs: [theme.id],
+      whereArgs: [pack.id],
     );
   }
 
-  Future<void> toggleThemeFavorite(String id, bool isFavorite) async {
+  Future<void> toggleStickerPackFavorite(String id, bool isFavorite) async {
     final db = await database;
     await db.update(
-      'themes',
+      'sticker_packs',
       {'isFavorite': isFavorite ? 1 : 0},
       where: 'id = ?',
       whereArgs: [id],
     );
   }
 
-  Future<void> deleteTheme(String id) async {
+  Future<void> deleteStickerPack(String id) async {
     final db = await database;
     await db.delete(
-      'themes',
+      'sticker_packs',
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -159,6 +160,6 @@ class DatabaseService {
   Future<void> clearAllData() async {
     final db = await database;
     await db.delete('stickers');
-    await db.delete('themes');
+    await db.delete('sticker_packs');
   }
 }

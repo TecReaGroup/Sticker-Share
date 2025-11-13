@@ -3,14 +3,14 @@ class StickerModel {
   final String name;
   final String localPath; // Path for Lottie preview
   final String gifPath;   // Path for GIF sharing to messaging apps
-  final String themeId;
+  final String packId;
 
   StickerModel({
     required this.id,
     required this.name,
     required this.localPath,
     required this.gifPath,
-    required this.themeId,
+    required this.packId,
   });
 
   Map<String, dynamic> toMap() => {
@@ -18,7 +18,7 @@ class StickerModel {
         'name': name,
         'localPath': localPath,
         'gifPath': gifPath,
-        'themeId': themeId,
+        'packId': packId,
       };
 
   factory StickerModel.fromMap(Map<String, dynamic> map) => StickerModel(
@@ -26,7 +26,7 @@ class StickerModel {
         name: map['name'] as String,
         localPath: map['localPath'] as String,
         gifPath: map['gifPath'] as String? ?? map['localPath'] as String, // Fallback to localPath if null
-        themeId: map['themeId'] as String,
+        packId: map['packId'] as String,
       );
 
   StickerModel copyWith({
@@ -34,14 +34,14 @@ class StickerModel {
     String? name,
     String? localPath,
     String? gifPath,
-    String? themeId,
+    String? packId,
   }) {
     return StickerModel(
       id: id ?? this.id,
       name: name ?? this.name,
       localPath: localPath ?? this.localPath,
       gifPath: gifPath ?? this.gifPath,
-      themeId: themeId ?? this.themeId,
+      packId: packId ?? this.packId,
     );
   }
 }

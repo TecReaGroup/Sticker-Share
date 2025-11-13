@@ -3,15 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lottie/lottie.dart';
 import '../models/sticker_model.dart';
-import '../models/theme_model.dart';
+import '../models/sticker_pack_model.dart';
 import '../services/database_service.dart';
 
 class StickerProvider with ChangeNotifier {
   final DatabaseService _databaseService = DatabaseService();
   
   List<StickerModel> _stickers = [];
-  List<ThemeModel> _themes = [];
-  String? _selectedThemeId;
+  List<StickerPackModel> _stickerPacks = [];
+  String? _selectedPackId;
   bool _showFavoritesOnly = false;
   bool _isLoading = false;
   String? _error;
@@ -22,39 +22,39 @@ class StickerProvider with ChangeNotifier {
   bool _backgroundLoadingCancelled = false;
 
   List<StickerModel> get stickers => _stickers;
-  List<ThemeModel> get themes => _themes;
-  String? get selectedThemeId => _selectedThemeId;
+  List<StickerPackModel> get stickerPacks => _stickerPacks;
+  String? get selectedPackId => _selectedPackId;
   bool get showFavoritesOnly => _showFavoritesOnly;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  List<ThemeModel> get favoriteThemes =>
-      _themes.where((theme) => theme.isFavorite).toList();
+  List<StickerPackModel> get favoriteStickerPacks =>
+      _stickerPacks.where((pack) => pack.isFavorite).toList();
 
   List<StickerModel> get filteredStickers {
-    // If showing favorites only, filter by favorite themes
+    // If showing favorites only, filter by favorite packs
     if (_showFavoritesOnly) {
-      final favoriteThemeIds = favoriteThemes.map((t) => t.id).toSet();
+      final favoritePackIds = favoriteStickerPacks.map((p) => p.id).toSet();
       final favStickers = _stickers
-          .where((sticker) => favoriteThemeIds.contains(sticker.themeId))
+          .where((sticker) => favoritePackIds.contains(sticker.packId))
           .toList();
       
-      // If a specific theme is selected, further filter by that theme
-      if (_selectedThemeId != null) {
+      // If a specific pack is selected, further filter by that pack
+      if (_selectedPackId != null) {
         return favStickers
-            .where((sticker) => sticker.themeId == _selectedThemeId)
+            .where((sticker) => sticker.packId == _selectedPackId)
             .toList();
       }
       return favStickers;
     }
     
-    // If not showing favorites, just filter by selected theme if any
-    if (_selectedThemeId == null) {
+    // If not showing favorites, just filter by selected pack if any
+    if (_selectedPackId == null) {
       return _stickers;
     }
     
     return _stickers
-        .where((sticker) => sticker.themeId == _selectedThemeId)
+        .where((sticker) => sticker.packId == _selectedPackId)
         .toList();
   }
 
@@ -65,12 +65,12 @@ class StickerProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      await loadThemes();
+      await loadStickerPacks();
       await loadStickers();
       
-      // Auto-select first theme if available
-      if (_themes.isNotEmpty && _selectedThemeId == null) {
-        _selectedThemeId = _themes.first.id;
+      // Auto-select first pack if available
+      if (_stickerPacks.isNotEmpty && _selectedPackId == null) {
+        _selectedPackId = _stickerPacks.first.id;
       }
     } catch (e, stackTrace) {
       _error = 'Initialize error: $e';
@@ -82,9 +82,9 @@ class StickerProvider with ChangeNotifier {
   }
 
   // Load all stickers
-  Future<void> loadStickers({String? themeId}) async {
+  Future<void> loadStickers({String? packId}) async {
     try {
-      _stickers = await _databaseService.getStickers(themeId: themeId);
+      _stickers = await _databaseService.getStickers(packId: packId);
       _error = null;
       notifyListeners();
     } catch (e) {
@@ -93,14 +93,14 @@ class StickerProvider with ChangeNotifier {
     }
   }
 
-  // Load themes
-  Future<void> loadThemes() async {
+  // Load sticker packs
+  Future<void> loadStickerPacks() async {
     try {
-      _themes = await _databaseService.getThemes();
+      _stickerPacks = await _databaseService.getStickerPacks();
       _error = null;
       notifyListeners();
     } catch (e) {
-      _error = 'Failed to load themes: $e';
+      _error = 'Failed to load sticker packs: $e';
       notifyListeners();
     }
   }
@@ -131,60 +131,60 @@ class StickerProvider with ChangeNotifier {
     }
   }
 
-  // Add theme
-  Future<void> addTheme(ThemeModel theme) async {
+  // Add sticker pack
+  Future<void> addStickerPack(StickerPackModel pack) async {
     try {
-      await _databaseService.insertTheme(theme);
-      _themes.add(theme);
+      await _databaseService.insertStickerPack(pack);
+      _stickerPacks.add(pack);
       _error = null;
       notifyListeners();
     } catch (e) {
-      _error = 'Failed to add theme: $e';
+      _error = 'Failed to add sticker pack: $e';
       notifyListeners();
     }
   }
 
-  // Toggle theme favorite
-  Future<void> toggleThemeFavorite(String themeId) async {
+  // Toggle sticker pack favorite
+  Future<void> toggleStickerPackFavorite(String packId) async {
     try {
-      final index = _themes.indexWhere((theme) => theme.id == themeId);
+      final index = _stickerPacks.indexWhere((pack) => pack.id == packId);
       if (index != -1) {
-        final theme = _themes[index];
-        final updatedTheme = theme.copyWith(isFavorite: !theme.isFavorite);
-        await _databaseService.toggleThemeFavorite(themeId, updatedTheme.isFavorite);
-        _themes[index] = updatedTheme;
+        final pack = _stickerPacks[index];
+        final updatedPack = pack.copyWith(isFavorite: !pack.isFavorite);
+        await _databaseService.toggleStickerPackFavorite(packId, updatedPack.isFavorite);
+        _stickerPacks[index] = updatedPack;
         _error = null;
         notifyListeners();
       }
     } catch (e) {
-      _error = 'Failed to toggle theme favorite: $e';
+      _error = 'Failed to toggle sticker pack favorite: $e';
       notifyListeners();
     }
   }
 
-  // Delete theme
-  Future<void> deleteTheme(String id) async {
+  // Delete sticker pack
+  Future<void> deleteStickerPack(String id) async {
     try {
-      await _databaseService.deleteTheme(id);
-      await _databaseService.deleteStickersByTheme(id);
-      _themes.removeWhere((theme) => theme.id == id);
-      _stickers.removeWhere((sticker) => sticker.themeId == id);
+      await _databaseService.deleteStickerPack(id);
+      await _databaseService.deleteStickersByPack(id);
+      _stickerPacks.removeWhere((pack) => pack.id == id);
+      _stickers.removeWhere((sticker) => sticker.packId == id);
       _error = null;
       notifyListeners();
     } catch (e) {
-      _error = 'Failed to delete theme: $e';
+      _error = 'Failed to delete sticker pack: $e';
       notifyListeners();
     }
   }
 
-  // Select theme for filtering
-  void selectTheme(String? themeId) {
-    // Only allow switching to a different theme, not deselecting
-    if (themeId != null && themeId != _selectedThemeId) {
-      _selectedThemeId = themeId;
+  // Select sticker pack for filtering
+  void selectStickerPack(String? packId) {
+    // Only allow switching to a different pack, not deselecting
+    if (packId != null && packId != _selectedPackId) {
+      _selectedPackId = packId;
       notifyListeners();
-      // Prioritize loading current theme stickers
-      _prioritizeThemeLoading(themeId);
+      // Prioritize loading current pack stickers
+      _prioritizePackLoading(packId);
     }
   }
 
@@ -213,16 +213,16 @@ class StickerProvider with ChangeNotifier {
     _loadLottiesInBackground();
   }
 
-  // Prioritize loading for specific theme
-  void _prioritizeThemeLoading(String themeId) {
-    debugPrint('🎯 Prioritizing theme: $themeId');
+  // Prioritize loading for specific pack
+  void _prioritizePackLoading(String packId) {
+    debugPrint('🎯 Prioritizing pack: $packId');
     
     // Cancel current background loading
     _backgroundLoadingCancelled = true;
     
     // Restart with new priority
     Future.delayed(const Duration(milliseconds: 100), () {
-      if (_selectedThemeId == themeId) {
+      if (_selectedPackId == packId) {
         _isBackgroundLoading = false;
         startBackgroundLoading();
       }
@@ -231,21 +231,21 @@ class StickerProvider with ChangeNotifier {
 
   // Load Lottie animations one by one in background
   Future<void> _loadLottiesInBackground() async {
-    // Get stickers sorted by priority: current theme first, then others
-    final currentThemeStickers = _stickers
-        .where((s) => s.themeId == _selectedThemeId)
+    // Get stickers sorted by priority: current pack first, then others
+    final currentPackStickers = _stickers
+        .where((s) => s.packId == _selectedPackId)
         .where((s) => !_loadedLotties.contains(s.localPath))
         .toList();
     
     final otherStickers = _stickers
-        .where((s) => s.themeId != _selectedThemeId)
+        .where((s) => s.packId != _selectedPackId)
         .where((s) => !_loadedLotties.contains(s.localPath))
         .toList();
     
-    final orderedStickers = [...currentThemeStickers, ...otherStickers];
+    final orderedStickers = [...currentPackStickers, ...otherStickers];
     
     debugPrint('📊 Loading queue: ${orderedStickers.length} Lotties '
-        '(${currentThemeStickers.length} from current theme)');
+        '(${currentPackStickers.length} from current pack)');
     
     // Load one by one with delay to avoid overwhelming the system
     for (int i = 0; i < orderedStickers.length; i++) {
@@ -288,7 +288,7 @@ class StickerProvider with ChangeNotifier {
     super.dispose();
   }
 
-  // Scan assets directory and load themes/stickers
+  // Scan assets directory and load sticker packs/stickers
   Future<void> scanAndLoadAssets() async {
     try {
       debugPrint('Starting asset scan...');
@@ -297,7 +297,7 @@ class StickerProvider with ChangeNotifier {
       final manifestContent = await rootBundle.loadString('AssetManifest.json');
       final Map<String, dynamic> manifestMap = json.decode(manifestContent);
       
-      // Parse asset paths to extract theme names and sticker file names
+      // Parse asset paths to extract pack names and sticker file names
       final Map<String, Set<String>> stickersData = {};
       final RegExp stickerPattern = RegExp(
         r'assets/stickers/([^/]+)/lottie/(.+)\.json$'
@@ -306,70 +306,70 @@ class StickerProvider with ChangeNotifier {
       for (final assetPath in manifestMap.keys) {
         final match = stickerPattern.firstMatch(assetPath);
         if (match != null) {
-          final themeName = match.group(1)!;
+          final packName = match.group(1)!;
           final fileName = match.group(2)!;
           
-          stickersData.putIfAbsent(themeName, () => <String>{});
-          stickersData[themeName]!.add(fileName);
+          stickersData.putIfAbsent(packName, () => <String>{});
+          stickersData[packName]!.add(fileName);
         }
       }
       
-      debugPrint('Found ${stickersData.length} themes from AssetManifest.json');
+      debugPrint('Found ${stickersData.length} sticker packs from AssetManifest.json');
       for (final entry in stickersData.entries) {
-        debugPrint('Theme: ${entry.key}, Stickers: ${entry.value.length}');
+        debugPrint('Pack: ${entry.key}, Stickers: ${entry.value.length}');
       }
       
       for (final entry in stickersData.entries) {
-        final themeFolder = entry.key;
+        final packFolder = entry.key;
         final fileNames = entry.value;
         
-        debugPrint('Processing theme: $themeFolder');
-        final dbThemes = await _databaseService.getThemes();
-        if (!dbThemes.any((t) => t.id == themeFolder)) {
-          await _databaseService.insertTheme(ThemeModel(
-            id: themeFolder,
-            name: themeFolder,
+        debugPrint('Processing pack: $packFolder');
+        final dbPacks = await _databaseService.getStickerPacks();
+        if (!dbPacks.any((p) => p.id == packFolder)) {
+          await _databaseService.insertStickerPack(StickerPackModel(
+            id: packFolder,
+            name: packFolder,
             isFavorite: false,
           ));
         }
 
-        final dbStickers = await _databaseService.getStickers(themeId: themeFolder);
+        final dbStickers = await _databaseService.getStickers(packId: packFolder);
         
         // Check if we need to update old records (those not pointing to Lottie JSON)
         final needsUpdate = dbStickers.any((s) => !s.localPath.endsWith('.json'));
         
         if (dbStickers.isEmpty || needsUpdate) {
-          // Delete old stickers for this theme
+          // Delete old stickers for this pack
           if (needsUpdate) {
-            debugPrint('Updating old stickers for $themeFolder');
+            debugPrint('Updating old stickers for $packFolder');
             for (final oldSticker in dbStickers) {
               await _databaseService.deleteSticker(oldSticker.id);
             }
           }
           
-          debugPrint('Adding ${fileNames.length} stickers for $themeFolder');
+          debugPrint('Adding ${fileNames.length} stickers for $packFolder');
           for (final fileName in fileNames) {
             // Use Lottie JSON for preview, GIF for sharing
             final sticker = StickerModel(
-              id: '${themeFolder}_$fileName',
+              id: '${packFolder}_$fileName',
               name: fileName,
-              localPath: 'assets/stickers/$themeFolder/lottie/$fileName.json',
-              gifPath: 'assets/stickers/$themeFolder/gif/$fileName.gif',
-              themeId: themeFolder,
+              localPath: 'assets/stickers/$packFolder/lottie/$fileName.json',
+              gifPath: 'assets/stickers/$packFolder/gif/$fileName.gif',
+              packId: packFolder,
             );
             await _databaseService.insertSticker(sticker);
           }
         }
       }
       
-      debugPrint('Loading themes and stickers...');
-      await loadThemes();
+      debugPrint('Loading sticker packs and stickers...');
+      await loadStickerPacks();
       await loadStickers();
       
-      debugPrint('Loaded ${_themes.length} themes and ${_stickers.length} stickers');
+      debugPrint('Loaded ${_stickerPacks.length} packs and ${_stickers.length} stickers');
       
-      if (_themes.isNotEmpty && _selectedThemeId == null) {
-        _selectedThemeId = _themes.first.id;
+      if (_stickerPacks.isNotEmpty && _selectedPackId == null) {
+        _selectedPackId = _stickerPacks.first.id;
       }
     } catch (e, stackTrace) {
       _error = 'Failed to scan assets: $e';

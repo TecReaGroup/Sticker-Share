@@ -1,9 +1,9 @@
-class ThemeModel {
+class StickerPackModel {
   final String id;
   final String name;
   final bool isFavorite;
 
-  ThemeModel({
+  StickerPackModel({
     required this.id,
     required this.name,
     this.isFavorite = false,
@@ -15,18 +15,18 @@ class ThemeModel {
         'isFavorite': isFavorite ? 1 : 0,
       };
 
-  factory ThemeModel.fromMap(Map<String, dynamic> map) => ThemeModel(
+  factory StickerPackModel.fromMap(Map<String, dynamic> map) => StickerPackModel(
         id: map['id'],
         name: map['name'],
         isFavorite: map['isFavorite'] == 1,
       );
 
-  ThemeModel copyWith({
+  StickerPackModel copyWith({
     String? id,
     String? name,
     bool? isFavorite,
   }) {
-    return ThemeModel(
+    return StickerPackModel(
       id: id ?? this.id,
       name: name ?? this.name,
       isFavorite: isFavorite ?? this.isFavorite,

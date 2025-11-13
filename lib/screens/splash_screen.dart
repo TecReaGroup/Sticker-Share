@@ -48,7 +48,7 @@ class _SplashScreenState extends State<SplashScreen>
 
       final provider = context.read<StickerProvider>();
 
-      // Scan and load assets (themes and stickers metadata only)
+      // Scan and load assets (sticker packs and stickers metadata only)
       await provider.scanAndLoadAssets();
 
       // Wait minimum 1.5 seconds for better UX
