@@ -331,16 +331,6 @@ class _ThemeSelectorState extends State<_ThemeSelector> {
                 },
                 onLongPress: () {
                   provider.toggleThemeFavorite(theme.id);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        theme.isFavorite
-                            ? 'Theme unfavorited'
-                            : 'Theme favorited',
-                      ),
-                      duration: const Duration(seconds: 1),
-                    ),
-                  );
                 },
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -664,11 +654,7 @@ class _StickerCardState extends State<_StickerCard>
       );
 
       if (context.mounted) {
-        if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Opening ${app.displayName}...')),
-          );
-        } else {
+        if (!success) {
           _showError(context, 'Share failed, please retry');
         }
       }
