@@ -7,7 +7,7 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         
-        // Register WeChat share plugin
-        flutterEngine.plugins.add(WeChatSharePlugin())
+        // Register messaging share plugin
+        flutterEngine.plugins.add(MessagingSharePlugin())
     }
 }

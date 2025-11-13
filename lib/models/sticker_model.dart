@@ -2,7 +2,7 @@ class StickerModel {
   final String id;
   final String name;
   final String localPath; // Path for Lottie preview
-  final String gifPath;   // Path for GIF sharing to WeChat
+  final String gifPath;   // Path for GIF sharing to messaging apps
   final String themeId;
 
   StickerModel({

@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:lottie/lottie.dart';
 import '../providers/sticker_provider.dart';
 import '../models/sticker_model.dart';
-import '../services/wechat_share_service.dart';
+import '../services/messaging_share_service.dart';
 import 'package:flutter/services.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -16,14 +16,17 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _scrollController = ScrollController();
+  late PageController _pageController;
   bool _isScrolling = false;
   bool _isFingerDown = false; // Track if finger is touching the screen
   Timer? _resumeAnimationTimer; // Timer for delayed animation resume
+  int _currentPageIndex = 0;
 
   @override
   void initState() {
     super.initState();
     // Data is already preloaded in splash screen, no need to load again
+    _pageController = PageController();
   }
 
   bool _handleScrollNotification(ScrollNotification notification) {
@@ -41,6 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _resumeAnimationTimer?.cancel();
     _scrollController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -126,6 +130,26 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           }
 
+          // Get the list of themes to display
+          final displayThemes = provider.showFavoritesOnly
+              ? provider.favoriteThemes
+              : provider.themes;
+
+          // Find current theme index
+          final currentThemeIndex = displayThemes.indexWhere(
+            (theme) => theme.id == provider.selectedThemeId,
+          );
+
+          // Update page controller if theme changed externally (e.g., from theme selector)
+          if (currentThemeIndex != -1 && _currentPageIndex != currentThemeIndex) {
+            _currentPageIndex = currentThemeIndex;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (_pageController.hasClients) {
+                _pageController.jumpToPage(currentThemeIndex);
+              }
+            });
+          }
+
           return Listener(
             onPointerDown: (_) {
               // Finger touches screen - pause animations immediately
@@ -155,32 +179,49 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               );
             },
-            child: NotificationListener<ScrollNotification>(
-              onNotification: _handleScrollNotification,
-              child: GridView.builder(
-                controller: _scrollController,
-                key: ValueKey(
-                  'grid_${provider.selectedThemeId}_${provider.showFavoritesOnly}',
-                ),
-                padding: const EdgeInsets.all(8),
-                physics: const BouncingScrollPhysics(
-                  parent: AlwaysScrollableScrollPhysics(),
-                ),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                  childAspectRatio: 1,
-                ),
-                itemCount: stickers.length,
-                itemBuilder: (context, index) {
-                  final sticker = stickers[index];
-                  return _StickerCard(
-                    sticker: sticker,
-                    isScrolling: _isScrolling,
-                  );
-                },
-              ),
+            child: PageView.builder(
+              controller: _pageController,
+              itemCount: displayThemes.length,
+              onPageChanged: (index) {
+                // Update current page index
+                _currentPageIndex = index;
+                // Switch to the corresponding theme
+                if (index >= 0 && index < displayThemes.length) {
+                  provider.selectTheme(displayThemes[index].id);
+                }
+              },
+              itemBuilder: (context, pageIndex) {
+                final theme = displayThemes[pageIndex];
+                final themeStickers = provider.stickers
+                    .where((s) => s.themeId == theme.id)
+                    .toList();
+
+                return NotificationListener<ScrollNotification>(
+                  onNotification: _handleScrollNotification,
+                  child: GridView.builder(
+                    controller: _scrollController,
+                    key: ValueKey('grid_${theme.id}'),
+                    padding: const EdgeInsets.all(8),
+                    physics: const BouncingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics(),
+                    ),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                      childAspectRatio: 1,
+                    ),
+                    itemCount: themeStickers.length,
+                    itemBuilder: (context, index) {
+                      final sticker = themeStickers[index];
+                      return _StickerCard(
+                        sticker: sticker,
+                        isScrolling: _isScrolling,
+                      );
+                    },
+                  ),
+                );
+              },
             ),
           );
         },
@@ -410,55 +451,123 @@ class _StickerCardState extends State<_StickerCard>
     );
   }
 
-  void _showShareDialog(BuildContext context, StickerModel sticker) {
+  void _showShareDialog(BuildContext context, StickerModel sticker) async {
+    // Get installed apps
+    debugPrint('=== Share Dialog Debug START ===');
+    final installedApps = await MessagingShareService.getInstalledApps();
+    debugPrint('Detected ${installedApps.length} messaging apps');
+    for (var app in installedApps) {
+      debugPrint('  - ${app.displayName} (${app.packageName})');
+    }
+    debugPrint('=== Share Dialog Debug END ===');
+    
+    if (!context.mounted) return;
+    
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+      isScrollControlled: true,
+      builder: (BuildContext modalContext) {
+        debugPrint('>>> Building bottom sheet with ${installedApps.length} apps');
+        final widgets = <Widget>[];
+        
+        // Build widgets for each installed app
+        for (var app in installedApps) {
+          debugPrint('>>> Creating ListTile for ${app.displayName}');
+          widgets.add(
             ListTile(
-              leading: const Icon(Icons.wechat, color: Colors.green, size: 32),
-              title: const Text('Share to WeChat'),
+              leading: Icon(_getAppIcon(app), color: _getAppColor(app), size: 32),
+              title: Text('Share to ${app.displayName}'),
               subtitle: const Text('Preserve GIF animation'),
               onTap: () async {
-                Navigator.pop(context);
-                await _shareToWeChat(context, sticker);
+                Navigator.pop(modalContext);
+                await _shareToApp(context, sticker, app);
               },
             ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.share, color: Colors.blue, size: 32),
-              title: const Text('Share to other apps'),
-              onTap: () {
-                Navigator.pop(context);
-                _showComingSoon(context);
-              },
-            ),
-          ],
-        ),
-      ),
+          );
+        }
+        
+        // Add divider if there are installed apps
+        if (installedApps.isNotEmpty) {
+          widgets.add(const Divider());
+        }
+        
+        // Add generic share option
+        widgets.add(
+          ListTile(
+            leading: const Icon(Icons.share, color: Colors.blue, size: 32),
+            title: const Text('Share to other apps'),
+            onTap: () async {
+              Navigator.pop(modalContext);
+              await _shareGeneric(context, sticker);
+            },
+          ),
+        );
+        
+        debugPrint('>>> Total widgets created: ${widgets.length}');
+        
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.3,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              padding: const EdgeInsets.all(16),
+              child: ListView(
+                controller: scrollController,
+                children: widgets,
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
-  Future<void> _shareToWeChat(
+  IconData _getAppIcon(MessagingApp app) {
+    switch (app) {
+      case MessagingApp.wechat:
+        return Icons.chat_bubble;
+      case MessagingApp.qq:
+        return Icons.forum;
+      case MessagingApp.whatsapp:
+        return Icons.chat;
+      case MessagingApp.telegram:
+        return Icons.send;
+      case MessagingApp.discord:
+        return Icons.discord;
+      case MessagingApp.messenger:
+        return Icons.messenger;
+      case MessagingApp.line:
+        return Icons.chat_bubble_outline;
+      case MessagingApp.x:
+        return Icons.tag;
+    }
+  }
+
+  Color _getAppColor(MessagingApp app) {
+    final colors = {
+      MessagingApp.wechat: Colors.green,
+      MessagingApp.qq: Colors.blue,
+      MessagingApp.whatsapp: const Color(0xFF25D366),
+      MessagingApp.telegram: const Color(0xFF0088CC),
+      MessagingApp.discord: const Color(0xFF5865F2),
+      MessagingApp.messenger: const Color(0xFF0084FF),
+      MessagingApp.line: const Color(0xFF00B900),
+      MessagingApp.x: Colors.black,
+    };
+    return colors[app] ?? Colors.grey;
+  }
+
+  Future<void> _shareToApp(
     BuildContext context,
     StickerModel sticker,
+    MessagingApp app,
   ) async {
     try {
-      // Check if WeChat is installed
-      final isInstalled = await WeChatShareService.isWeChatInstalled();
-      if (!isInstalled) {
-        if (context.mounted) {
-          _showError(context, 'WeChat not installed');
-        }
-        return;
-      }
-
       // Show loading dialog
       if (context.mounted) {
         showDialog(
@@ -469,7 +578,7 @@ class _StickerCardState extends State<_StickerCard>
         );
       }
 
-      // Read GIF file for WeChat sharing
+      // Read GIF file
       final ByteData data = await rootBundle.load(sticker.gifPath);
       final Uint8List gifData = data.buffer.asUint8List();
 
@@ -478,18 +587,60 @@ class _StickerCardState extends State<_StickerCard>
         Navigator.pop(context);
       }
 
-      // Share to WeChat (replace with real AppID)
-      final success = await WeChatShareService.shareGifToWeChat(
+      // Share to app
+      final success = await MessagingShareService.shareGifToApp(
         gifData: gifData,
-        appId: 'YOUR_WECHAT_APPID',
+        packageName: app.packageName,
       );
 
       if (context.mounted) {
         if (success) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Opening WeChat...')));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Opening ${app.displayName}...')),
+          );
         } else {
+          _showError(context, 'Share failed, please retry');
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        _showError(context, 'Share failed: $e');
+      }
+    }
+  }
+
+  Future<void> _shareGeneric(
+    BuildContext context,
+    StickerModel sticker,
+  ) async {
+    try {
+      // Show loading dialog
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) =>
+              const Center(child: CircularProgressIndicator()),
+        );
+      }
+
+      // Read GIF file
+      final ByteData data = await rootBundle.load(sticker.gifPath);
+      final Uint8List gifData = data.buffer.asUint8List();
+
+      // Close loading dialog
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+
+      // Share generically
+      final success = await MessagingShareService.shareGifGeneric(
+        gifData: gifData,
+      );
+
+      if (context.mounted) {
+        if (!success) {
           _showError(context, 'Share failed, please retry');
         }
       }
@@ -517,10 +668,5 @@ class _StickerCardState extends State<_StickerCard>
     );
   }
 
-  void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Coming soon')));
-  }
 }
 

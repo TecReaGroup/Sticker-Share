@@ -51,22 +51,7 @@ android/app/src/main/kotlin/           # Android原生代码
 flutter pub get
 ```
 
-### 2. 配置微信AppID（仅 iOS 需要）
-
-**重要说明：**
-- ✅ **Android**: 使用 Intent 分享，**不需要配置 AppID** 即可直接使用
-- ⚠️ **iOS**: 使用 URL Scheme 跳转，**必须配置 AppID** 才能使用
-
-如果需要支持 iOS，在 `lib/screens/home_screen.dart` 中替换微信AppID：
-
-```dart
-final success = await WeChatShareService.shareGifToWeChat(
-  gifData: gifData,
-  appId: 'YOUR_WECHAT_APPID', // iOS必需，Android可忽略
-);
-```
-
-### 3. 运行应用
+### 2. 运行应用
 
 ```bash
 # iOS
@@ -191,12 +176,12 @@ assets/stickers/
 | 特性 | iOS | Android |
 |------|-----|---------|
 | 分享方式 | URL Scheme + 剪贴板 | Intent 系统分享 |
-| 是否需要 AppID | ✅ **必需** | ❌ **不需要** |
-| 是否需要注册微信开放平台 | ✅ 是 | ❌ 否 |
+| 是否需要配置 | ❌ **不需要** | ❌ **不需要** |
+| 是否需要注册微信开放平台 | ❌ 否 | ❌ 否 |
 | GIF 动画保持 | ✅ 是 | ✅ 是 |
-| 实现复杂度 | 较复杂 | 简单 |
+| 实现复杂度 | 简单 | 简单 |
 
-### 微信分享（Android）- 推荐使用
+### 微信分享（Android）
 
 Android 使用 Intent 系统分享，**无需任何配置**即可使用：
 
@@ -209,18 +194,17 @@ val intent = Intent(Intent.ACTION_SEND).apply {
 ```
 
 **优点：**
-- ✅ 不需要微信 AppID
-- ✅ 不需要注册微信开放平台
+- ✅ 不需要微信开放平台注册
 - ✅ 开箱即用
 - ✅ GIF 动画完美保持
 
 ### 微信分享（iOS）
 
-iOS 使用 PropertyList + 剪贴板方式，**需要配置 AppID**：
+iOS 使用 PropertyList + 剪贴板方式，**无需配置**即可使用：
 
 1. 构造 PropertyList 数据包（objectType = "8"）
 2. 写入剪贴板（type: "content"）
-3. 跳转微信（weixin://app/{appId}/sendreq/?）
+3. 跳转微信（weixin://app/[identifier]/sendreq/?）
 
 关键代码：
 ```swift
@@ -228,13 +212,16 @@ let messageDict: [String: Any] = [
     "objectType": "8",  // GIF类型标识
     "fileData": gifData.data,
     "thumbData": getThumbnail(from: gifData.data),
+    "command": "1010",
+    "scene": sceneValue,
     // ...
 ]
 ```
 
-**要求：**
-- ⚠️ 必须在微信开放平台注册应用获取 AppID
-- ⚠️ 必须配置 Bundle ID
+**优点：**
+- ✅ 不需要微信开放平台注册
+- ✅ 开箱即用
+- ✅ GIF 动画完美保持
 
 ## 资源文件
 
@@ -288,16 +275,16 @@ let messageDict: [String: Any] = [
 ### 平台特定
 
 **Android (开箱即用)**
-1. ✅ **无需微信 AppID** - 直接使用即可
+1. ✅ **无需任何配置** - 直接使用即可
 2. ✅ **无需注册微信开放平台**
 3. ✅ **测试环境**: 只需安装微信
 4. ✅ **GIF格式**: 自动保持动画效果
 
-**iOS (需要配置)**
-1. ⚠️ **必需微信 AppID** - 需在微信开放平台注册
-2. ⚠️ **必需配置 Bundle ID**
-3. ⚠️ **测试环境**: 需要真机 + 微信
-4. ⚠️ **GIF格式**: 需正确配置才能保持动画
+**iOS (开箱即用)**
+1. ✅ **无需任何配置** - 直接使用即可
+2. ✅ **无需注册微信开放平台**
+3. ✅ **测试环境**: 需要真机 + 微信
+4. ✅ **GIF格式**: 自动保持动画效果
 
 ### 通用注意事项
 

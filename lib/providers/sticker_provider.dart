@@ -349,7 +349,7 @@ class StickerProvider with ChangeNotifier {
           
           debugPrint('Adding ${fileNames.length} stickers for $themeFolder');
           for (final fileName in fileNames) {
-            // Use Lottie JSON for preview, GIF for WeChat sharing
+            // Use Lottie JSON for preview, GIF for sharing
             final sticker = StickerModel(
               id: '${themeFolder}_$fileName',
               name: fileName,

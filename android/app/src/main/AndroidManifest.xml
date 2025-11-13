@@ -56,7 +56,15 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
-        <!-- WeChat package query -->
-        <package android:name="com.tencent.mm"/>
+        
+        <!-- Messaging apps package queries (required for Android 11+) -->
+        <package android:name="com.tencent.mm"/>           <!-- WeChat -->
+        <package android:name="com.tencent.mobileqq"/>     <!-- QQ -->
+        <package android:name="com.whatsapp"/>             <!-- WhatsApp -->
+        <package android:name="org.telegram.messenger"/>   <!-- Telegram -->
+        <package android:name="com.discord"/>              <!-- Discord -->
+        <package android:name="com.facebook.orca"/>        <!-- Messenger -->
+        <package android:name="jp.naver.line.android"/>    <!-- LINE -->
+        <package android:name="com.twitter.android"/>      <!-- X/Twitter -->
     </queries>
 </manifest>
