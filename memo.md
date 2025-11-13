@@ -6,3 +6,5 @@ Discord
 Facebook Messenger
 LINE
 X
+
+Android

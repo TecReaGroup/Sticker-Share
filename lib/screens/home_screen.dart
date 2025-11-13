@@ -22,7 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
   
   // Theme swipe state
   double _horizontalDragOffset = 0.0;
-  static const double _swipeThreshold = 10.0; // Minimum drag distance to trigger switch
+  static const double _swipeThreshold = 4.0; // Minimum drag distance to trigger switch
 
   @override
   void initState() {
@@ -141,26 +141,24 @@ class _HomeScreenState extends State<HomeScreen> {
             },
             onHorizontalDragUpdate: (details) {
               setState(() {
-                // Add resistance effect (slower movement when dragging)
-                _horizontalDragOffset += details.delta.dx * 0.5;
-                
-                // Limit drag distance
                 final currentIndex = themes.indexWhere((t) => t.id == provider.selectedThemeId);
                 
-                // Prevent dragging right if at first theme
-                if (currentIndex == 0 && _horizontalDragOffset > 0) {
-                  _horizontalDragOffset = _horizontalDragOffset.clamp(0.0, 50.0);
+                // Completely prevent dragging at boundaries
+                if (currentIndex == 0 && details.delta.dx > 0) {
+                  // At first theme, don't allow right drag
+                  return;
                 }
                 
-                // Prevent dragging left if at last theme
-                if (currentIndex == themes.length - 1 && _horizontalDragOffset < 0) {
-                  _horizontalDragOffset = _horizontalDragOffset.clamp(-50.0, 0.0);
+                if (currentIndex == themes.length - 1 && details.delta.dx < 0) {
+                  // At last theme, don't allow left drag
+                  return;
                 }
+                
+                // Add resistance effect (slower movement when dragging)
+                _horizontalDragOffset += details.delta.dx * 0.85;
                 
                 // Normal clamp for middle themes
-                if (currentIndex > 0 && currentIndex < themes.length - 1) {
-                  _horizontalDragOffset = _horizontalDragOffset.clamp(-150.0, 150.0);
-                }
+                _horizontalDragOffset = _horizontalDragOffset.clamp(-150.0, 150.0);
               });
             },
             onHorizontalDragEnd: (details) {
@@ -224,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           'grid_${provider.selectedThemeId}_${provider.showFavoritesOnly}',
                         ),
                         padding: const EdgeInsets.all(8),
-                        physics: const BouncingScrollPhysics(
+                        physics: const ClampingScrollPhysics(
                           parent: AlwaysScrollableScrollPhysics(),
                         ),
                         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
