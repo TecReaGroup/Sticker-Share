@@ -1,0 +1,121 @@
+name: Build and Release APK
+
+on:
+  # Trigger workflow when a new tag is pushed
+  push:
+    tags:
+      - 'v*.*.*'
+  
+  # Allow manual workflow dispatch
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.0)'
+        required: true
+        type: string
+
+# Grant necessary permissions to GITHUB_TOKEN
+permissions:
+  contents: write
+  
+jobs:
+  build-and-release:
+    name: Build APK and Create Release
+    runs-on: ubuntu-latest
+    
+    steps:
+      # Checkout the repository code
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # Setup Java 17 for Android build
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+      
+      # Setup Flutter SDK
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.27.1'
+          channel: 'stable'
+          cache: true
+      
+      # Get Flutter dependencies
+      - name: Get dependencies
+        run: flutter pub get
+      
+      # Verify Flutter setup
+      - name: Run Flutter doctor
+        run: flutter doctor -v
+      
+      # Decode and setup keystore from GitHub secrets
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+      
+      # Create key.properties file from GitHub secrets
+      - name: Create key.properties
+        run: |
+          cat > android/key.properties << EOF
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=upload-keystore.jks
+          EOF
+      
+      # Build APK with release configuration
+      - name: Build APK
+        run: flutter build apk --release --split-per-abi
+      
+      # Build App Bundle (optional, for Play Store)
+      - name: Build App Bundle
+        run: flutter build appbundle --release
+      
+      # Get version from tag or input
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+      
+      # Rename APK files with version number
+      - name: Rename APK files
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          mv build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
+             build/app/outputs/flutter-apk/sticker-share-${VERSION}-armeabi-v7a.apk
+          mv build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+             build/app/outputs/flutter-apk/sticker-share-${VERSION}-arm64-v8a.apk
+          mv build/app/outputs/flutter-apk/app-x86_64-release.apk \
+             build/app/outputs/flutter-apk/sticker-share-${VERSION}-x86_64.apk
+      
+      # Create GitHub Release
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          name: Release ${{ steps.version.outputs.VERSION }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            build/app/outputs/flutter-apk/sticker-share-${{ steps.version.outputs.VERSION }}-armeabi-v7a.apk
+            build/app/outputs/flutter-apk/sticker-share-${{ steps.version.outputs.VERSION }}-arm64-v8a.apk
+            build/app/outputs/flutter-apk/sticker-share-${{ steps.version.outputs.VERSION }}-x86_64.apk
+            build/app/outputs/bundle/release/app-release.aab
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      # Clean up sensitive files
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f android/app/upload-keystore.jks
+          rm -f android/key.properties
