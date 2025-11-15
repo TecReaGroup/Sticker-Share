@@ -15,7 +15,7 @@ Sticker Share: Manage and share animated stickers to various messaging platforms
 
 ## Notes
 
-[Telegram Stickers Download](https://github.com/TecReaGroup/telgram_stickers_download)
+[Telegram Stickers Download](https://github.com/TecReaGroup/telegram_stickers_download)
 
 Currently only tested on Android, the specific situation for Android is as follows:
 
